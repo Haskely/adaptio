@@ -1,0 +1,35 @@
+[project]
+name = "adaptio"
+description = "Adaptio 是一个基于 Python asyncio 的智能并发控制工具。它借鉴了 TCP 拥塞控制算法的思想，可以根据系统负载动态调整并发任务的数量，从而优化任务吞吐量并防止过载。此外，还提供了一个装饰器，当任务因系统过载失败时自动重试。"
+authors = [
+    { name = "Haskely", email = "Haskely@live.com" }
+]
+dependencies = [
+    "loguru",
+    "aiohttp",
+    "colorlog",
+]
+readme = "README.md"
+requires-python = ">= 3.10"
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/Haskely/adaptio"
+"Bug Reports" = "https://github.com/Haskely/adaptio/issues"
+"Source" = "https://github.com/Haskely/adaptio"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+include = ["src"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+include = ["src/adaptio/py.typed"]

@@ -1,0 +1,19 @@
+# python generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# venv
+.venv
+
+# temp dir
+.test_task
+
+# mypy
+.mypy_cache
+
+# ruff
+.ruff_cache
