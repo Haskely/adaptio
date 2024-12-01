@@ -2,6 +2,15 @@
 
 Adaptio 是一个基于 Python asyncio 的智能并发控制工具。它借鉴了 TCP 拥塞控制算法的思想，可以根据系统负载动态调整并发任务的数量，从而优化任务吞吐量并防止过载。此外，还提供了一个装饰器，当任务因系统过载失败时自动重试。
 
+## 目录
+
+- [特性](#特性)
+- [安装](#安装)
+- [快速开始](#快速开始)
+- [装饰 aiohttp 请求函数](#装饰-aiohttp-请求函数)
+- [异步控制装饰器](#异步控制装饰器with_async_control)
+- [开发指南](#开发指南)
+
 ## 特性
 
 - 🚀 动态并发控制 - 自动调整工作协程数量
@@ -12,13 +21,29 @@ Adaptio 是一个基于 Python asyncio 的智能并发控制工具。它借鉴�
 
 ## 安装
 
+要求 Python 3.10 或更高版本。
+
 ```bash
-python3.10 -m venv .venv --prompt adaptio
-source .venv/bin/activate
 pip install adaptio
 ```
 
 ## 快速开始
+
+### 最简单的使用方式
+
+```python
+from adaptio import with_adaptive_retry
+
+@with_adaptive_retry()
+async def my_task():
+    # 你的异步任务代码
+    return await some_async_operation()
+
+# 运行任务
+await my_task()
+```
+
+### 详细示例
 
 本库提供自适应重试装饰器：with_adaptive_retry
 
@@ -321,3 +346,23 @@ git push origin v0.1.0
    - 运行测试
    - 构建包
    - 发布到 PyPI
+
+## 常见问题
+
+### Q: 如何选择合适的装饰器？
+
+- 如果需要动态调整并发数，使用 `with_adaptive_retry`
+- 如果需要固定的并发限制和QPS控制，使用 `with_async_control`
+- 如果是处理 aiohttp 请求，可以组合使用 `raise_on_aiohttp_overload` 和 `with_adaptive_retry`
+
+### Q: 为什么我的任务一直在重试？
+
+通常是因为：
+1. 系统确实处于过载状态
+2. 重试参数配置不合理
+3. 未正确处理异常
+
+建议检查：
+- 调整 max_concurrency 和 min_concurrency 参数
+- 适当增加 retry_interval_seconds
+- 确保异常处理逻辑正确
