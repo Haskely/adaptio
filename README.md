@@ -1,5 +1,12 @@
 # Adaptio
 
+> 智能自适应的异步并发控制库，让你的Python异步任务运行更稳定、更高效
+
+[![PyPI version](https://badge.fury.io/py/adaptio.svg)](https://badge.fury.io/py/adaptio)
+[![Python Version](https://img.shields.io/pypi/pyversions/adaptio.svg)](https://pypi.org/project/adaptio/)
+[![License](https://img.shields.io/github/license/Haskely/adaptio.svg)](https://github.com/Haskely/adaptio/blob/main/LICENSE)
+[![Tests](https://github.com/Haskely/adaptio/workflows/Tests/badge.svg)](https://github.com/Haskely/adaptio/actions)
+
 Adaptio 是一个基于 Python asyncio 的智能并发控制工具。它借鉴了 TCP 拥塞控制算法的思想，可以根据系统负载动态调整并发任务的数量，从而优化任务吞吐量并防止过载。此外，还提供了一个装饰器，当任务因系统过载失败时自动重试。
 
 ## 特性
@@ -12,9 +19,9 @@ Adaptio 是一个基于 Python asyncio 的智能并发控制工具。它借鉴�
 
 ## 安装
 
+从 PyPI 安装最新稳定版：
+
 ```bash
-python3.10 -m venv .venv --prompt adaptio
-source .venv/bin/activate
 pip install adaptio
 ```
 
@@ -46,8 +53,8 @@ from adaptio import with_adaptive_retry, ServiceOverloadError
 import asyncio
 import random
 
-# 设计一个达到 32 并发就会触发 ServiceOverloadError 的测试任务
-sample_task_overload_threshold = 32
+# 设计一个达到 16 并发就会触发 ServiceOverloadError 的测试任务
+sample_task_overload_threshold = 16
 sample_task_running_count = 0
 
 async def sample_task(task_id):
@@ -104,23 +111,40 @@ async def task_type_b(task_id):
     return await sample_task(task_id)
 
 # 运行示例任务
-async def sample_task_with_shared_scheduler():
+async def main():
+    print("=== 测试方法1：使用默认配置 ===")
+    tasks1 = [sample_task_with_retry(i) for i in range(100)]
+    for result in asyncio.as_completed(tasks1):
+        try:
+            print(await result)
+        except Exception as e:
+            print(f"任务失败: {e}")
+    
+    print("\n=== 测试方法2：使用自定义配置 ===")
+    tasks2 = [sample_task_with_custom_retry(i) for i in range(100)]
+    for result in asyncio.as_completed(tasks2):
+        try:
+            print(await result)
+        except Exception as e:
+            print(f"任务失败: {e}")
+    
+    print("\n=== 测试方法3：使用共享调度器 ===")
     # 混合运行不同类型的任务，它们会共享并发限制
-    tasks = []
-    for i in range(500):
+    tasks3 = []
+    for i in range(100):
         if i % 2 == 0:
-            tasks.append(task_type_a(i))
+            tasks3.append(task_type_a(i))
         else:
-            tasks.append(task_type_b(i))
-
-    for result in asyncio.as_completed(tasks):
+            tasks3.append(task_type_b(i))
+            
+    for result in asyncio.as_completed(tasks3):
         try:
             print(await result)
         except Exception as e:
             print(f"任务失败: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(sample_task_with_shared_scheduler())
+    asyncio.run(main())
 ```
 
 解释
@@ -321,3 +345,17 @@ git push origin v0.1.0
    - 运行测试
    - 构建包
    - 发布到 PyPI
+
+## 常见问题
+
+### Q: 如何选择合适的初始并发数？
+A: 建议从较小的值开始（如4-8），让系统自动调节到最优值。过大的初始值可能导致系统启动时出现过载。
+
+### Q: 不同装饰器的使用场景？
+A: 
+- `with_adaptive_retry`: 适合需要动态调节并发的场景，特别是负载变化较大的情况
+- `with_async_control`: 适合需要固定并发限制和QPS控制的场景
+- `raise_on_aiohttp_overload`: 专门用于处理HTTP请求的过载情况
+
+### Q: 如何监控系统运行状态？
+A: 可以通过设置 `log_level="DEBUG"` 来查看详细的调节过程，或者直接访问调度器的属性如 `current_concurrency` 获取运行时状态。
