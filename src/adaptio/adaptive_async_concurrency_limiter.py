@@ -74,6 +74,12 @@ class AdaptiveAsyncConcurrencyLimiter:
         # 添加新的变量来跟踪调整状态
         self.increase_step = 1  # 初始增长步长
         self.decrease_factor = 0.75  # 遇到过载时的下降因子
+        
+    def reset_counters(self):
+        self.current_failed_count = 0
+        self.current_overload_count = 0
+        self.current_succeed_count = 0
+        self.current_finished_count = 0
 
     async def adjust_concurrency(self):
         """借鉴TCP的拥塞控制算法调整 workers 数量"""
@@ -149,13 +155,11 @@ class AdaptiveAsyncConcurrencyLimiter:
                         f"基准并发度: {self.workers_lock.initial_value}"
                     )
                     if self.workers_lock.get_value() < 0:
-                        self.current_failed_count = 0
-                        self.current_overload_count = 0
-                        self.current_succeed_count = 0
-                        self.current_finished_count = 0
+                        self.reset_counters()
 
                     if self.current_finished_count > self.workers_lock.initial_value:
                         await self.adjust_concurrency()
+                        self.reset_counters()
 
         def _on_done(task):
             # self.finished_tasks.put_nowait(task)
