@@ -45,11 +45,16 @@ class TestAdjustableSemaphore(unittest.TestCase):
                     await asyncio.sleep(0.1)
                     return True
 
-            # 验证新的限制值是否生效
-            tasks = [task() for _ in range(2)]
+            # 创建任务而不是直接使用协程
+            tasks = [asyncio.create_task(task()) for _ in range(2)]
             done, pending = await asyncio.wait(tasks, timeout=0.15)
             self.assertEqual(len(done), 1)  # 只有一个任务应该完成
             self.assertEqual(len(pending), 1)  # 一个任务应该还在等待
+
+            # 清理剩余的任务
+            for t in pending:
+                t.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
 
         self.loop.run_until_complete(test_sem())
 
