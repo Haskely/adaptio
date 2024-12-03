@@ -30,6 +30,3 @@ include = ["src"]
 
 [tool.hatch.version]
 source = "vcs"
-
-[tool.hatch.build.targets.wheel]
-include = ["src/adaptio/py.typed"]

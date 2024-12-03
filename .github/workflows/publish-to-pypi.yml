@@ -29,6 +29,9 @@ env:
   PYPI_PROJECT_NAME: adaptio
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   check-tag:
     # https://stackoverflow.com/a/58869470/14140458
     # https://packaging.python.org/en/latest/specifications/version-specifiers/#appendix-parsing-version-strings-with-regular-expressions
@@ -48,6 +51,7 @@ jobs:
     outputs:
       PEP_0440_final_match: ${{ steps.check-tag.outputs.PEP_0440_final_match }}
       PEP_0440_match: ${{ steps.check-tag.outputs.PEP_0440_match }}
+    needs: [test]
 
   build:
     name: Build distribution 📦

@@ -62,6 +62,7 @@ class AdjustableSemaphore:
 
 if __name__ == "__main__":
     import time
+    import random
 
     current_working_count = 0
 
@@ -73,23 +74,29 @@ if __name__ == "__main__":
             print(
                 f"[{time.strftime('%H:%M:%S')}] 工作者 {worker_id} 开始执行，当前并发数：{sem.initial_value - sem.get_value()} 当前工作协程数：{current_working_count}"
             )
-            await asyncio.sleep(2)  # 模拟耗时操作
+            await asyncio.sleep(random.uniform(2))  # 模拟耗时操作
             print(f"[{time.strftime('%H:%M:%S')}] 工作者 {worker_id} 完成")
             current_working_count -= 1
 
     async def dynamic_controller(sem: AdjustableSemaphore):
         """动态控制并发数量"""
+        print(f"\n[{time.strftime('%H:%M:%S')}] 初始并发数为 {sem.initial_value}")
         await asyncio.sleep(10)  # 等待一些任务开始执行
+        
         print(f"\n[{time.strftime('%H:%M:%S')}] 将并发数调整为 2")
         await sem.set_value(2)
-
         await asyncio.sleep(10)
+        
         print(f"\n[{time.strftime('%H:%M:%S')}] 将并发数调整为 7")
         await sem.set_value(7)
-
         await asyncio.sleep(10)
+        
         print(f"\n[{time.strftime('%H:%M:%S')}] 将并发数调整为 3")
         await sem.set_value(3)
+        await asyncio.sleep(10)
+        
+        print(f"\n[{time.strftime('%H:%M:%S')}] 将并发数调整为 1")
+        await sem.set_value(1)
 
     async def main():
         # 初始并发数为 3

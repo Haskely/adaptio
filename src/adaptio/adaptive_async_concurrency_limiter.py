@@ -64,7 +64,9 @@ class AdaptiveAsyncConcurrencyLimiter:
 
         self.submitted_tasks: set[asyncio.Future] = set()
 
+        self.current_failed_count = 0
         self.current_overload_count = 0
+        self.current_succeed_count = 0
         self.current_finished_count = 0
         self.current_running_count = 0
 
@@ -105,8 +107,6 @@ class AdaptiveAsyncConcurrencyLimiter:
                 f"系统运行正常，提升并发数从 {self.workers_lock.initial_value} 到 {new_concurrency}，下次增长步长: {self.increase_step}"
             )
 
-        self.current_overload_count = 0
-        self.current_finished_count = 0
         await self.workers_lock.set_value(new_concurrency)
 
     def submit(self, coro: Coroutine):
@@ -118,32 +118,40 @@ class AdaptiveAsyncConcurrencyLimiter:
                 self.current_running_count += 1
                 try:
                     result = await coro
-                    self.current_finished_count += 1
+                    self.current_succeed_count += 1
                     return result
                 except self.overload_exception:
                     self.current_overload_count += 1
                     self.logger.debug(
                         f"服务过载，当前触发过载任务数: {self.current_overload_count} "
                         f"任务状态 - 已完成: {self.current_finished_count}, "
+                        f"成功数: {self.current_succeed_count}, "
                         f"运行中: {self.current_running_count}, "
                         f"过载数: {self.current_overload_count}, "
+                        f"失败数: {self.current_failed_count}, "
                         f"当前并发度: {self.workers_lock.get_value()}, "
                         f"基准并发度: {self.workers_lock.initial_value}",
                     )
                     raise
                 except Exception:
+                    self.current_failed_count += 1
                     raise
                 finally:
+                    self.current_finished_count += 1
                     self.current_running_count -= 1
                     self.logger.debug(
                         f"任务状态 - 已完成: {self.current_finished_count}, "
+                        f"成功数: {self.current_succeed_count}, "
                         f"运行中: {self.current_running_count}, "
                         f"过载数: {self.current_overload_count}, "
+                        f"失败数: {self.current_failed_count}, "
                         f"当前并发度: {self.workers_lock.get_value()}, "
                         f"基准并发度: {self.workers_lock.initial_value}"
                     )
                     if self.workers_lock.get_value() < 0:
+                        self.current_failed_count = 0
                         self.current_overload_count = 0
+                        self.current_succeed_count = 0
                         self.current_finished_count = 0
 
                     if self.current_finished_count > self.workers_lock.initial_value:
