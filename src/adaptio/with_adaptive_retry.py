@@ -59,6 +59,9 @@ def with_adaptive_retry(
     def decorator(
         func: Callable[..., Coroutine[Any, Any, R]],
     ) -> Callable[..., Coroutine[Any, Any, R]]:
+        if not _scheduler.log_prefix:
+            _scheduler.log_prefix = getattr(func, "__name__", "unnamed_function")
+
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> R:
             retries = 0
@@ -72,7 +75,7 @@ def with_adaptive_retry(
                     retries += 1
                     if retries > max_retries:
                         retry_logger.error(
-                            f"{log_prefix} -- 重试次数已达上限({retries}次)，服务仍处于过载状态"
+                            f"{_scheduler.log_prefix} -- 重试次数已达上限({retries}次)，服务仍处于过载状态"
                         )
                         raise
                     await asyncio.sleep(retry_interval_seconds)
