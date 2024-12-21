@@ -13,6 +13,12 @@
 ### 修复
 - 无
 
+## [0.1.3] - 2024-03-04
+
+### 变更
+- 优化了 `with_adaptive_retry` 装饰器的日志前缀处理，现在会自动使用被装饰函数的名称作为日志前缀
+- 改进了重试日志的可读性和追踪能力
+
 ## [0.1.2] - 2024-03-03
 
 ### 变更
@@ -43,7 +49,8 @@
 - 添加自动发布到 PyPI 的支持
 - 添加详细的使用文档和示例
 
-[未发布]: https://github.com/Haskely/adaptio/compare/v0.1.2...HEAD
+[未发布]: https://github.com/Haskely/adaptio/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Haskely/adaptio/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Haskely/adaptio/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Haskely/adaptio/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Haskely/adaptio/releases/tag/v0.1.0 
