@@ -27,15 +27,3 @@ repos:
     hooks:
       - id: prettier
         types_or: [css, javascript]
-
-  - repo: local
-    hooks:
-      - id: unittest
-        name: Run unittest
-        entry: python -m unittest discover tests
-        language: system
-        types: [python]
-        pass_filenames: false
-        always_run: true
-        env:
-          PYTHONPATH: ./src

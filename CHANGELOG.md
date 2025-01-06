@@ -8,7 +8,7 @@
 - 无
 
 ### 变更
-- 无
+- 移除了 with_async_control 装饰器中的 raise_after_retry 参数，简化异常处理逻辑
 
 ### 修复
 - 无
@@ -53,4 +53,4 @@
 [0.1.3]: https://github.com/Haskely/adaptio/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Haskely/adaptio/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Haskely/adaptio/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/Haskely/adaptio/releases/tag/v0.1.0 
+[0.1.0]: https://github.com/Haskely/adaptio/releases/tag/v0.1.0

@@ -30,3 +30,9 @@ include = ["src"]
 
 [tool.hatch.version]
 source = "vcs"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0.1",
+    "pytest>=8.3.4",
+]

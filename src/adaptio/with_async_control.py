@@ -3,7 +3,7 @@ from collections.abc import Awaitable, Coroutine
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from .log_utils import setup_colored_logger
+from adaptio.log_utils import setup_colored_logger
 
 T = TypeVar("T")
 
@@ -27,10 +27,7 @@ def with_async_control(
     max_qps: float = 0,
     retry_n: int = 3,
     retry_delay: float = 1.0,
-    raise_after_retry: bool = True,
-) -> Callable[
-    [Callable[..., Awaitable[T]]], Callable[..., Coroutine[Any, Any, T | Exception]]
-]:
+) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Coroutine[Any, Any, T]]]:
     """
     异步函数的装饰器，提供并发限制、QPS控制和重试功能
 
@@ -40,7 +37,6 @@ def with_async_control(
         max_qps: 每秒最大请求数 (0表示不限制)
         retry_n: 重试次数
         retry_delay: 重试间隔时间(秒)
-        raise_after_retry: 重试失败后是否抛出异常
 
     返回:
         装饰器函数
@@ -48,7 +44,7 @@ def with_async_control(
 
     def decorator(
         func: Callable[..., Awaitable[T]],
-    ) -> Callable[..., Coroutine[Any, Any, T | Exception]]:
+    ) -> Callable[..., Coroutine[Any, Any, T]]:
         # 为每个装饰器实例创建独立的锁
         concurrency_sem = (
             asyncio.Semaphore(max_concurrency) if max_concurrency > 0 else FakeLock()
@@ -56,7 +52,7 @@ def with_async_control(
         qps_lock = asyncio.Lock()
 
         @wraps(func)
-        async def wrapper(*args, **kwargs) -> T | Exception:
+        async def wrapper(*args, **kwargs) -> T:
             async with concurrency_sem:
                 for attempt in range(retry_n + 1):
                     try:
@@ -72,10 +68,7 @@ def with_async_control(
                             logger.error(
                                 f"（{attempt+1}/{retry_n}） 尝试 {func.__name__} 达到最大次数！"
                             )
-                            if raise_after_retry:
-                                raise
-                            else:
-                                return e
+                            raise
                         await asyncio.sleep(retry_delay)
                 raise Exception("所有重试都失败了")
 
@@ -93,7 +86,6 @@ if __name__ == "__main__":
         max_qps=10,
         retry_n=3,
         retry_delay=0.5,
-        raise_after_retry=False,
     )
     async def test_api(i: int) -> str:
         # 模拟一个可能失败的API调用
@@ -115,7 +107,7 @@ if __name__ == "__main__":
         for i, future in enumerate(asyncio.as_completed(tasks)):
             try:
                 result = await future
-                logger.success(f"任务 {i} 成功: {result}")
+                logger.info(f"任务 {i} 成功: {result}")
             except Exception as e:
                 logger.warning(
                     f"任务 {i} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"

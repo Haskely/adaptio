@@ -119,7 +119,7 @@ async def main():
             print(await result)
         except Exception as e:
             print(f"任务失败: {e}")
-    
+
     print("\n=== 测试方法2：使用自定义配置 ===")
     tasks2 = [sample_task_with_custom_retry(i) for i in range(100)]
     for result in asyncio.as_completed(tasks2):
@@ -127,7 +127,7 @@ async def main():
             print(await result)
         except Exception as e:
             print(f"任务失败: {e}")
-    
+
     print("\n=== 测试方法3：使用共享调度器 ===")
     # 混合运行不同类型的任务，它们会共享并发限制
     tasks3 = []
@@ -136,7 +136,7 @@ async def main():
             tasks3.append(task_type_a(i))
         else:
             tasks3.append(task_type_b(i))
-            
+
     for result in asyncio.as_completed(tasks3):
         try:
             print(await result)
@@ -219,7 +219,6 @@ if __name__ == "__main__":
 - max_qps：每秒最大请求数，默认为 0（不限制）
 - retry_n：重试次数，默认为 3 次
 - retry_delay：重试间隔时间（秒），默认为 1.0 秒
-- raise_after_retry：重试失败后是否抛出异常，默认为 False
 
 使用示例：
 
@@ -352,7 +351,7 @@ git push origin v0.1.0
 A: 建议从较小的值开始（如4-8），让系统自动调节到最优值。过大的初始值可能导致系统启动时出现过载。
 
 ### Q: 不同装饰器的使用场景？
-A: 
+A:
 - `with_adaptive_retry`: 适合需要动态调节并发的场景，特别是负载变化较大的情况
 - `with_async_control`: 适合需要固定并发限制和QPS控制的场景
 - `raise_on_aiohttp_overload`: 专门用于处理HTTP请求的过载情况

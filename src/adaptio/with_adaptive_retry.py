@@ -70,7 +70,7 @@ def with_adaptive_retry(
             while True:
                 try:
                     task = _scheduler.submit(func(*args, **kwargs))
-                    return await task
+                    return await task  # type: ignore
                 except _scheduler.overload_exception:
                     retries += 1
                     if retries > max_retries:

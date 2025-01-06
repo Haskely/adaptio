@@ -33,12 +33,19 @@ class TestWithAsyncControl(unittest.TestCase):
 
     def test_with_async_control_error_handling(self):
         async def test_control_error():
-            @with_async_control(max_concurrency=2)
+            retry_count = 0
+
+            @with_async_control(exception_type=ValueError, retry_n=2, retry_delay=0.1)
             async def failing_task():
+                nonlocal retry_count
+                retry_count += 1
                 raise ValueError("Test error")
 
             with self.assertRaises(ValueError):
                 await failing_task()
+
+            # 验证重试次数：初始尝试 + 2次重试 = 3次
+            self.assertEqual(retry_count, 3)
 
         self.loop.run_until_complete(test_control_error())
 
