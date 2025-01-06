@@ -8,10 +8,15 @@
 - 无
 
 ### 变更
-- 移除了 with_async_control 装饰器中的 raise_after_retry 参数，简化异常处理逻辑
+- 无
 
 ### 修复
 - 无
+
+## [0.1.4] - 2024-03-05
+
+### 变更
+- 移除了 with_async_control 装饰器中的 raise_after_retry 参数，简化异常处理逻辑
 
 ## [0.1.3] - 2024-03-04
 
@@ -49,7 +54,8 @@
 - 添加自动发布到 PyPI 的支持
 - 添加详细的使用文档和示例
 
-[未发布]: https://github.com/Haskely/adaptio/compare/v0.1.3...HEAD
+[未发布]: https://github.com/Haskely/adaptio/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/Haskely/adaptio/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Haskely/adaptio/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Haskely/adaptio/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Haskely/adaptio/compare/v0.1.0...v0.1.1
