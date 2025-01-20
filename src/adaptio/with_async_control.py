@@ -22,7 +22,9 @@ class FakeLock:
 
 
 def with_async_control(
-    exception_type: type[Exception] | tuple[type[Exception], ...] = Exception,
+    cared_exception: type[Exception]
+    | tuple[type[Exception], ...]
+    | Callable[[Exception], bool] = Exception,
     max_concurrency: int = 0,
     max_qps: float = 0,
     retry_n: int = 3,
@@ -32,7 +34,7 @@ def with_async_control(
     异步函数的装饰器，提供并发限制、QPS控制和重试功能
 
     参数:
-        exception_type: 需要捕获的异常类型
+        cared_exception: 需要捕获的异常类型或者一个输入为异常对象的函数
         max_concurrency: 最大并发数
         max_qps: 每秒最大请求数 (0表示不限制)
         retry_n: 重试次数
@@ -60,7 +62,12 @@ def with_async_control(
                             async with qps_lock:
                                 await asyncio.sleep(1 / max_qps)
                         return await func(*args, **kwargs)
-                    except exception_type as e:
+                    except Exception as e:
+                        if callable(cared_exception):
+                            if not cared_exception(e):
+                                raise
+                        elif not isinstance(e, cared_exception):
+                            raise
                         logger.error(
                             f"（{attempt+1}/{retry_n}） 尝试 {func.__name__} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"
                         )
@@ -81,7 +88,7 @@ if __name__ == "__main__":
     import time
 
     @with_async_control(
-        exception_type=ValueError,
+        cared_exception=ValueError,
         max_concurrency=5,
         max_qps=10,
         retry_n=3,
