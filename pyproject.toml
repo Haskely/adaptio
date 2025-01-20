@@ -31,8 +31,17 @@ include = ["src"]
 [tool.hatch.version]
 source = "vcs"
 
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "scm"
+update_changelog_on_bump = true
+major_version_zero = true
 [dependency-groups]
 dev = [
+    "commitizen>=4.1.0",
     "pre-commit>=4.0.1",
     "pytest>=8.3.4",
 ]
