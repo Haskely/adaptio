@@ -2,16 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
-## [未发布]
+## v0.2.0 (2025-01-20)
 
-### 新增
-- 无
+### Feat
 
-### 变更
-- 无
+- **with_async_control**: Refactor with_async_control decorator to enhance exception handling
 
-### 修复
-- 无
 
 ## [0.1.4] - 2024-03-05
 
@@ -53,10 +49,3 @@
 - 添加 CI/CD 工作流支持
 - 添加自动发布到 PyPI 的支持
 - 添加详细的使用文档和示例
-
-[未发布]: https://github.com/Haskely/adaptio/compare/v0.1.4...HEAD
-[0.1.4]: https://github.com/Haskely/adaptio/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/Haskely/adaptio/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/Haskely/adaptio/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/Haskely/adaptio/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/Haskely/adaptio/releases/tag/v0.1.0
