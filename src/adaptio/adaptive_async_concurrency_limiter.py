@@ -59,7 +59,6 @@ class AdaptiveAsyncConcurrencyLimiter:
         self.logger = setup_colored_logger(
             logger_name=f"scheduler_{id(self)}",
             log_level=log_level,
-            log_prefix=log_prefix,
         )
 
         self.submitted_tasks: set[asyncio.Future] = set()
@@ -74,7 +73,7 @@ class AdaptiveAsyncConcurrencyLimiter:
         # 添加新的变量来跟踪调整状态
         self.increase_step = 1  # 初始增长步长
         self.decrease_factor = 0.75  # 遇到过载时的下降因子
-        
+
     def reset_counters(self):
         self.current_failed_count = 0
         self.current_overload_count = 0
@@ -84,12 +83,12 @@ class AdaptiveAsyncConcurrencyLimiter:
     async def adjust_concurrency(self):
         """借鉴TCP的拥塞控制算法调整 workers 数量"""
         if self.current_finished_count == 0:
-            self.logger.debug("没有完成的任务，跳过调整")
+            self.logger.debug(f"{self.log_prefix} -- 没有完成的任务，跳过调整")
             return
 
         overload_rate = self.current_overload_count / self.current_finished_count
         self.logger.debug(
-            f"当前过载率: {overload_rate:.2%}, 调整阈值: {self.adjust_overload_rate:.2%}"
+            f"{self.log_prefix} -- 当前过载率: {overload_rate:.2%}, 调整阈值: {self.adjust_overload_rate:.2%}"
         )
 
         if overload_rate > self.adjust_overload_rate:
@@ -99,7 +98,9 @@ class AdaptiveAsyncConcurrencyLimiter:
                 int(self.workers_lock.initial_value * self.decrease_factor),
             )
             self.increase_step = 1  # 重置增长步长
-            self.logger.info(f"检测到过载，降低并发数至 {new_concurrency}")
+            self.logger.info(
+                f"{self.log_prefix} -- 检测到过载，降低并发数至 {new_concurrency}"
+            )
         else:
             # 未过载时，采用渐进式增长
             new_concurrency = min(
@@ -110,7 +111,7 @@ class AdaptiveAsyncConcurrencyLimiter:
                 self.increase_step * 2, 16
             )  # 指数增长步长，但设置上限
             self.logger.info(
-                f"系统运行正常，提升并发数从 {self.workers_lock.initial_value} 到 {new_concurrency}，下次增长步长: {self.increase_step}"
+                f"{self.log_prefix} -- 系统运行正常，提升并发数从 {self.workers_lock.initial_value} 到 {new_concurrency}，下次增长步长: {self.increase_step}"
             )
 
         await self.workers_lock.set_value(new_concurrency)
@@ -129,6 +130,7 @@ class AdaptiveAsyncConcurrencyLimiter:
                 except self.overload_exception:
                     self.current_overload_count += 1
                     self.logger.debug(
+                        f"{self.log_prefix} -- "
                         f"服务过载，当前触发过载任务数: {self.current_overload_count} "
                         f"任务状态 - 已完成: {self.current_finished_count}, "
                         f"成功数: {self.current_succeed_count}, "
@@ -146,6 +148,7 @@ class AdaptiveAsyncConcurrencyLimiter:
                     self.current_finished_count += 1
                     self.current_running_count -= 1
                     self.logger.debug(
+                        f"{self.log_prefix} -- "
                         f"任务状态 - 已完成: {self.current_finished_count}, "
                         f"成功数: {self.current_succeed_count}, "
                         f"运行中: {self.current_running_count}, "

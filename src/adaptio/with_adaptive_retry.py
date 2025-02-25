@@ -113,7 +113,7 @@ if __name__ == "__main__":
             sample_task_running_count -= 1
         return f"Task {task_id} done"
 
-    @with_adaptive_retry(initial_concurrency=4, log_level="INFO", log_prefix="test")
+    @with_adaptive_retry(initial_concurrency=4, log_level="INFO")
     async def sample_task_with_retry(task_id):
         return await sample_task(task_id)
 

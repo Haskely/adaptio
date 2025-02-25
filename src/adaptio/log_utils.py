@@ -6,7 +6,6 @@ import colorlog
 def setup_colored_logger(
     logger_name: str,
     log_level: str = "INFO",
-    log_prefix: str = "",
     propagate: bool = False,
 ) -> logging.Logger:
     """配置一个带有彩色输出的日志记录器
@@ -14,7 +13,6 @@ def setup_colored_logger(
     Args:
         logger_name: 日志记录器名称
         log_level: 日志级别，默认为 "INFO"
-        log_prefix: 日志前缀，默认为空字符串
         propagate: 是否传播日志到父级logger，默认为False
 
     Returns:
@@ -28,7 +26,7 @@ def setup_colored_logger(
 
     handler = colorlog.StreamHandler()
     formatter = colorlog.ColoredFormatter(
-        f"%(log_color)s%(asctime)s - %(name)s:%(filename)s:%(lineno)d:%(funcName)s - %(levelname)s - {log_prefix} %(message)s",
+        "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         log_colors={
             "DEBUG": "cyan",
             "INFO": "green",
