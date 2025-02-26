@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.2.1 (2025-02-25)
+
+### Refactor
+
+- **logging**: Remove log_prefix parameter and update logging format
+
 ## v0.2.0 (2025-01-20)
 
 ### Feat

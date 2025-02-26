@@ -336,8 +336,8 @@ async def process_items(items: AsyncIterator[str]) -> None:
 
 1. 更新版本号（使用 git tag）：
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+cz bump
+git push --follow-tags
 ```
 
 2. CI/CD 将自动：
