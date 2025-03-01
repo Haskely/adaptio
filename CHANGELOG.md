@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.2.2 (2025-03-01)
+
+### Fix
+
+- **with_async_control**: DO NOT log when retry_n=0
+
 ## v0.2.1 (2025-02-25)
 
 ### Refactor
