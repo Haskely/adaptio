@@ -27,7 +27,7 @@ def with_async_control(
     | Callable[[Exception], bool] = Exception,
     max_concurrency: int = 0,
     max_qps: float = 0,
-    retry_n: int = 3,
+    retry_n: int = 0,
     retry_delay: float = 1.0,
 ) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Coroutine[Any, Any, T]]]:
     """
@@ -43,6 +43,7 @@ def with_async_control(
     返回:
         装饰器函数
     """
+    retry_n = int(max(retry_n, 0))
 
     def decorator(
         func: Callable[..., Awaitable[T]],
@@ -63,6 +64,8 @@ def with_async_control(
                                 await asyncio.sleep(1 / max_qps)
                         return await func(*args, **kwargs)
                     except Exception as e:
+                        if retry_n <= 0:
+                            raise
                         if callable(cared_exception):
                             if not cared_exception(e):
                                 raise
