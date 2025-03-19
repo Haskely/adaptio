@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.3.0 (2025-03-19)
+
+### Feat
+
+- add `raise_on_overload` decorator for handling service overload errors
+
 ## v0.2.2 (2025-03-01)
 
 ### Fix
