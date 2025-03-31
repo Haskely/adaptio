@@ -1,6 +1,6 @@
 import functools
-from collections.abc import Coroutine, Iterable
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable, Coroutine, Iterable
+from typing import Any, TypeVar
 
 from .adaptive_async_concurrency_limiter import ServiceOverloadError
 

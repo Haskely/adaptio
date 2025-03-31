@@ -1,6 +1,6 @@
 import functools
-from collections.abc import Coroutine
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable, Coroutine
+from typing import Any, TypeVar
 
 import aiohttp
 

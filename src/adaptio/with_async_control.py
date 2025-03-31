@@ -1,7 +1,7 @@
 import asyncio
-from collections.abc import Awaitable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from adaptio.log_utils import setup_colored_logger
 
@@ -72,11 +72,11 @@ def with_async_control(
                         elif not isinstance(e, cared_exception):
                             raise
                         logger.error(
-                            f"（{attempt+1}/{retry_n}） 尝试 {func.__name__} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"
+                            f"（{attempt + 1}/{retry_n}） 尝试 {func.__name__} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"
                         )
                         if attempt >= retry_n:
                             logger.error(
-                                f"（{attempt+1}/{retry_n}） 尝试 {func.__name__} 达到最大次数！"
+                                f"（{attempt + 1}/{retry_n}） 尝试 {func.__name__} 达到最大次数！"
                             )
                             raise
                         await asyncio.sleep(retry_delay)

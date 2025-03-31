@@ -1,8 +1,8 @@
 import asyncio
 import logging
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from adaptio.adaptive_async_concurrency_limiter import (
     AdaptiveAsyncConcurrencyLimiter,
