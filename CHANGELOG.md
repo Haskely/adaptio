@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.3.2 (2025-04-15)
+
+### Feat
+
+- add ignore_loop_bound_exception option to AdjustableSemaphore
+
 ## v0.3.1 (2025-04-09)
 
 ## v0.3.0 (2025-03-19)
