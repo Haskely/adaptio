@@ -1,5 +1,7 @@
 import asyncio
 
+from loguru import logger
+
 
 class AdjustableSemaphore:
     """可调整容量的异步信号量
@@ -13,12 +15,23 @@ class AdjustableSemaphore:
         ValueError: 当尝试设置负数值时抛出
     """
 
-    def __init__(self, initial_value: int = 1) -> None:
+    def __init__(
+        self, initial_value: int = 1, ignore_loop_bound_exception: bool = False
+    ) -> None:
+        """
+        Args:
+            ignore_loop_bound_exception: whether to ignore the loop bound exception
+            https://github.com/python/cpython/blob/v3.13.3/Lib/asyncio/mixins.py#L20
+            If you acquire a semaphore which inited in a different asyncio loop, it actually doesn't have any ability to limit the concurrency!
+            As default, this library will raise a RuntimeError in this case.
+            But if you set this option to True, it will ignore the exception and do NOTHING!
+        """
         if initial_value < 0:
             raise ValueError("Initial semaphore value cannot be negative")
         self.initial_value = initial_value
         self._current_value = initial_value
         self._condition = asyncio.Condition()
+        self.ignore_loop_bound_exception = ignore_loop_bound_exception
 
     async def acquire(self) -> bool:
         """获取信号量"""
@@ -53,10 +66,32 @@ class AdjustableSemaphore:
         return self._current_value
 
     async def __aenter__(self):
-        await self.acquire()
+        try:
+            await self.acquire()
+        except RuntimeError as e:
+            if (
+                "is bound to a different event loop" in str(e)
+                and self.ignore_loop_bound_exception
+            ):
+                logger.warning(
+                    f"Catched the loop bound exception: {e}, but ignored it because ignore_loop_bound_exception is True, this semaphore is actually not working!"
+                )
+            else:
+                raise e
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.release()
+        try:
+            await self.release()
+        except RuntimeError as e:
+            if (
+                "is bound to a different event loop" in str(e)
+                and self.ignore_loop_bound_exception
+            ):
+                logger.warning(
+                    f"Catched the loop bound exception: {e}, but ignored it because ignore_loop_bound_exception is True, this semaphore is actually not working!"
+                )
+            else:
+                raise e
 
 
 if __name__ == "__main__":
