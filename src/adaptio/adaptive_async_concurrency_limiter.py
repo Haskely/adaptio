@@ -22,9 +22,16 @@ class AdaptiveAsyncConcurrencyLimiter:
         min_concurrency: 最小允许的并发数
         initial_concurrency: 初始并发数
         adjust_overload_rate: 触发并发度调整的过载率阈值
+            意思是在最近一轮并发调用中，若触发过载错误的调用数量超过这个比例，才会进行降低并发数操作
         overload_exception: 用于标识过载的异常类型
         log_level: 日志级别
         log_prefix: 日志前缀
+        ignore_loop_bound_exception: 是否忽略事件循环绑定异常
+            如果你获取了一个在另一个asyncio循环中初始化的信号量，实际上它没有任何限制并发的能力！
+            默认情况下，这个库在这种情况下会引发RuntimeError异常。
+            但是，如果你将此选项设置为True，它将忽略异常，并且除了打印一条 warning 外没有其他动作。
+            通常情况下很难在实际应用中出发这个错误，除非刻意写出在同步函数中使用多线程调用异步函数的代码。
+            https://github.com/python/cpython/blob/v3.13.3/Lib/asyncio/mixins.py#L20
     """
 
     def __init__(
@@ -36,6 +43,7 @@ class AdaptiveAsyncConcurrencyLimiter:
         overload_exception: type[BaseException] = ServiceOverloadError,
         log_level: str = "INFO",
         log_prefix: str = "",
+        ignore_loop_bound_exception: bool = False,
     ):
         if initial_concurrency < min_concurrency:
             raise ValueError(
@@ -69,7 +77,10 @@ class AdaptiveAsyncConcurrencyLimiter:
         self.current_finished_count = 0
         self.current_running_count = 0
 
-        self.workers_lock = AdjustableSemaphore(initial_concurrency)
+        self.workers_lock = AdjustableSemaphore(
+            initial_concurrency,
+            ignore_loop_bound_exception=ignore_loop_bound_exception,
+        )
         # 添加新的变量来跟踪调整状态
         self.increase_step = 1  # 初始增长步长
         self.decrease_factor = 0.75  # 遇到过载时的下降因子

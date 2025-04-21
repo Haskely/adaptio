@@ -23,6 +23,7 @@ def with_adaptive_retry(
     overload_exception: type[BaseException] = ServiceOverloadError,
     log_level: str = "INFO",
     log_prefix: str = "",
+    ignore_loop_bound_exception: bool = False,
 ) -> Callable[
     [Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]
 ]:
@@ -38,9 +39,16 @@ def with_adaptive_retry(
         min_concurrency: 当 scheduler 为 None 时使用的最小并发数
         initial_concurrency: 当 scheduler 为 None 时使用的初始并发数
         adjust_overload_rate: 当 scheduler 为 None 时使用的过载调整率
+            意思是在最近一轮并发调用中，若触发过载错误的调用数量超过这个比例，才会进行降低并发数操作
         overload_exception: 当 scheduler 为 None 时检测的过载异常类型
         log_level: 当 scheduler 为 None 时使用的日志级别
         log_prefix: 当 scheduler 为 None 时使用的日志前缀
+        ignore_loop_bound_exception: 是否忽略循环边界异常
+            如果你获取了一个在另一个asyncio循环中初始化的信号量，实际上它没有任何限制并发的能力！
+            默认情况下，这个库在这种情况下会引发RuntimeError异常。
+            但是，如果你将此选项设置为True，它将忽略异常，并且除了打印一条 warning 外没有其他动作。
+            通常情况下很难在实际应用中出发这个错误，除非刻意写出在同步函数中使用多线程调用异步函数的代码。
+            https://github.com/python/cpython/blob/v3.13.3/Lib/asyncio/mixins.py#L20
 
     Returns:
         装饰后的异步函数，具有自适应重试能力
@@ -54,6 +62,7 @@ def with_adaptive_retry(
         overload_exception=overload_exception,
         log_level=log_level,
         log_prefix=log_prefix,
+        ignore_loop_bound_exception=ignore_loop_bound_exception,
     )
 
     def decorator(

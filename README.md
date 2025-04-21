@@ -4,8 +4,11 @@
 
 [![PyPI version](https://badge.fury.io/py/adaptio.svg)](https://badge.fury.io/py/adaptio)
 [![Python Version](https://img.shields.io/pypi/pyversions/adaptio.svg)](https://pypi.org/project/adaptio/)
-[![License](https://img.shields.io/github/license/Haskely/adaptio.svg)](https://github.com/Haskely/adaptio/blob/main/LICENSE)
-[![Tests](https://github.com/Haskely/adaptio/workflows/Tests/badge.svg)](https://github.com/Haskely/adaptio/actions)
+[![License](https://img.shields.io/github/license/Haskely/adaptio.svg)](https://github.com/Haskely/adaptio/blob/main/LICENSE)ob/main/LICENSE)
+[![Downloads](https://static.pepy.tech/badge/omni-pathlib)](https://pepy.tech/project/omni-pathlib)
+[![GitHub Stars](https://img.shields.io/github/stars/Haskely/omni-pathlib.svg)](https://github.com/Haskely/omni-pathlib/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/Haskely/omni-pathlib.svg)](https://github.com/Haskely/omni-pathlib/issues)
+[![Dependencies](https://img.shields.io/librariesio/github/Haskely/omni-pathlib)](https://libraries.io/github/Haskely/omni-pathlib)
 
 Adaptio 是一个基于 Python asyncio 的智能并发控制工具。它借鉴了 TCP 拥塞控制算法的思想，可以根据系统负载动态调整并发任务的数量，从而优化任务吞吐量并防止过载。此外，还提供了一个装饰器，当任务因系统过载失败时自动重试。
 
@@ -40,9 +43,14 @@ pip install adaptio
 - min_concurrency（可选）：当 scheduler 为 None 时使用的最小并发数，默认为 1。
 - initial_concurrency（可选）：当 scheduler 为 None 时使用的初始并发数，默认为 1。
 - adjust_overload_rate（可选）：当 scheduler 为 None 时使用的过载调整率，默认为 0.1。
+    - 意思是在最近一轮并发调用中，若触发过载错误的调用数量超过这个比例，才会进行降低并发数操作
 - overload_exception（可选）：当 scheduler 为 None 时检测的过载异常，默认为 ServiceOverloadError。
 - log_level（可选）：当 scheduler 为 None 时使用的日志级别，默认为 "INFO"。
 - log_prefix（可选）：当 scheduler 为 None 时使用的日志前缀，默认为 ""。
+- ignore_loop_bound_exception（可选）：是否忽略事件循环绑定异常，默认为 False。
+  - 当信号量在一个事件循环中初始化但在另一个循环中被使用时，会引发异常
+  - 设置为 True 时将忽略此异常，但信号量将失去限制并发的能力
+  - 仅在特殊场景下使用，通常在使用多线程调用异步函数时才会触发此类异常
 
 使用方法
 
@@ -337,7 +345,8 @@ async def process_items(items: AsyncIterator[str]) -> None:
 1. 更新版本号（使用 git tag）：
 ```bash
 cz bump
-git push --follow-tags
+git push
+git push --tags
 ```
 
 2. CI/CD 将自动：
@@ -358,3 +367,6 @@ A:
 
 ### Q: 如何监控系统运行状态？
 A: 可以通过设置 `log_level="DEBUG"` 来查看详细的调节过程，或者直接访问调度器的属性如 `current_concurrency` 获取运行时状态。
+
+### Q: 什么情况下需要使用 `ignore_loop_bound_exception` 参数？
+A: 这个参数主要用于处理在多线程环境中使用异步代码的特殊情况。如果你在一个线程中初始化信号量，然后在另一个线程中的异步函数中使用它，可能会遇到"is bound to a different event loop"的错误。通常情况下，这表明代码设计有问题，应该修复异步/同步交互的逻辑。但在某些无法避免的情况下，可以设置该参数为 True 来忽略异常，但需要注意这会导致并发控制失效。大多数应用不需要设置此参数。
