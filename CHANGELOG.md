@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.3.3 (2025-04-21)
+
+### Feat
+
+- add ignore_loop_bound_exception option to AdaptiveAsyncConcurrencyLimiter and with_adaptive_retry
+
 ## v0.3.2 (2025-04-15)
 
 ### Feat
