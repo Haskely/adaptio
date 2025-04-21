@@ -1,67 +1,67 @@
 # Adaptio
 
-> 智能自适应的异步并发控制库，让你的Python异步任务运行更稳定、更高效
+> An intelligent adaptive asynchronous concurrency control library that makes your Python async tasks run more stably and efficiently
 
 [![PyPI version](https://badge.fury.io/py/adaptio.svg)](https://badge.fury.io/py/adaptio)
 [![Python Version](https://img.shields.io/pypi/pyversions/adaptio.svg)](https://pypi.org/project/adaptio/)
-[![License](https://img.shields.io/github/license/Haskely/adaptio.svg)](https://github.com/Haskely/adaptio/blob/main/LICENSE)ob/main/LICENSE)
-[![Downloads](https://static.pepy.tech/badge/omni-pathlib)](https://pepy.tech/project/omni-pathlib)
-[![GitHub Stars](https://img.shields.io/github/stars/Haskely/omni-pathlib.svg)](https://github.com/Haskely/omni-pathlib/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/Haskely/omni-pathlib.svg)](https://github.com/Haskely/omni-pathlib/issues)
-[![Dependencies](https://img.shields.io/librariesio/github/Haskely/omni-pathlib)](https://libraries.io/github/Haskely/omni-pathlib)
+[![License](https://img.shields.io/github/license/Haskely/adaptio.svg)](https://github.com/Haskely/adaptio/blob/main/LICENSE)
+[![Downloads](https://static.pepy.tech/badge/adaptio)](https://pepy.tech/project/adaptio)
+[![GitHub Stars](https://img.shields.io/github/stars/Haskely/adaptio.svg)](https://github.com/Haskely/adaptio/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/Haskely/adaptio.svg)](https://github.com/Haskely/adaptio/issues)
+[![Dependencies](https://img.shields.io/librariesio/github/Haskely/adaptio)](https://libraries.io/github/Haskely/adaptio)
 
-Adaptio 是一个基于 Python asyncio 的智能并发控制工具。它借鉴了 TCP 拥塞控制算法的思想，可以根据系统负载动态调整并发任务的数量，从而优化任务吞吐量并防止过载。此外，还提供了一个装饰器，当任务因系统过载失败时自动重试。
+[中文文档](README_ZH.md)
 
-## 特性
+Adaptio is an intelligent concurrency control tool based on Python asyncio. It draws inspiration from TCP congestion control algorithms to dynamically adjust the number of concurrent tasks based on system load, optimizing task throughput and preventing overload. Additionally, it provides a decorator for automatic retry of tasks that fail due to system overload.
 
-- 🚀 动态并发控制 - 自动调整工作协程数量
-- 🛡️ 过载保护 - 内置过载检测和处理机制
-- 📈 自适应调节 - 借鉴 TCP 拥塞控制算法实现平滑调节
-- 🔄 自动重试 - 提供装饰器支持任务重试
-- 🎯 简单易用 - 提供直观的 API 接口
+## Features
 
-## 安装
+- 🚀 Dynamic Concurrency Control - Automatically adjusts the number of worker coroutines
+- 🛡️ Overload Protection - Built-in overload detection and handling mechanisms
+- 📈 Adaptive Adjustment - Implements smooth adjustment inspired by TCP congestion control algorithms
+- 🔄 Automatic Retry - Provides decorator support for task retry
+- 🎯 Easy to Use - Offers intuitive API interface
 
-从 PyPI 安装最新稳定版：
+## Installation
+
+Install the latest stable version from PyPI:
 
 ```bash
 pip install adaptio
 ```
 
-## 快速开始
+## Quick Start
 
-本库提供自适应重试装饰器：with_adaptive_retry
+The library provides an adaptive retry decorator: `with_adaptive_retry`
 
-该装饰器可用于自动重试因系统过载 (ServiceOverloadError) 而失败的任务。
+This decorator can be used to automatically retry tasks that fail due to system overload (ServiceOverloadError).
 
-装饰器参数
+Decorator Parameters:
 
-- scheduler（可选）：AdaptiveAsyncConcurrencyLimiter 实例，默认为 None。如果为 None，则为每个装饰的函数创建独立的调度器。
-- max_retries（可选）：最大重试次数，默认为 1024 次。
-- retry_interval_seconds（可选）：重试之间的间隔时间（秒），默认为 1 秒。
-- max_concurrency（可选）：当 scheduler 为 None 时使用的最大并发数，默认为 256。
-- min_concurrency（可选）：当 scheduler 为 None 时使用的最小并发数，默认为 1。
-- initial_concurrency（可选）：当 scheduler 为 None 时使用的初始并发数，默认为 1。
-- adjust_overload_rate（可选）：当 scheduler 为 None 时使用的过载调整率，默认为 0.1。
-    - 意思是在最近一轮并发调用中，若触发过载错误的调用数量超过这个比例，才会进行降低并发数操作
-- overload_exception（可选）：当 scheduler 为 None 时检测的过载异常，默认为 ServiceOverloadError。
-- log_level（可选）：当 scheduler 为 None 时使用的日志级别，默认为 "INFO"。
-- log_prefix（可选）：当 scheduler 为 None 时使用的日志前缀，默认为 ""。
-- ignore_loop_bound_exception（可选）：是否忽略事件循环绑定异常，默认为 False。
-  - 当信号量在一个事件循环中初始化但在另一个循环中被使用时，会引发异常
-  - 设置为 True 时将忽略此异常，但信号量将失去限制并发的能力
-  - 仅在特殊场景下使用，通常在使用多线程调用异步函数时才会触发此类异常
+- scheduler (optional): AdaptiveAsyncConcurrencyLimiter instance, defaults to None. If None, creates an independent scheduler for each decorated function.
+- max_retries (optional): Maximum number of retries, defaults to 1024.
+- retry_interval_seconds (optional): Interval between retries in seconds, defaults to 1 second.
+- max_concurrency (optional): Maximum concurrency when scheduler is None, defaults to 256.
+- min_concurrency (optional): Minimum concurrency when scheduler is None, defaults to 1.
+- initial_concurrency (optional): Initial concurrency when scheduler is None, defaults to 1.
+- adjust_overload_rate (optional): Overload adjustment rate when scheduler is None, defaults to 0.1.
+    - This means that if the number of calls triggering overload errors exceeds this ratio in the recent round of concurrent calls, the concurrency will be reduced
+- overload_exception (optional): Overload exception to detect when scheduler is None, defaults to ServiceOverloadError.
+- log_level (optional): Log level when scheduler is None, defaults to "INFO".
+- log_prefix (optional): Log prefix when scheduler is None, defaults to "".
+- ignore_loop_bound_exception (optional): Whether to ignore event loop binding exceptions, defaults to False.
+  - An exception is raised when a semaphore is initialized in one event loop but used in another
+  - When set to True, this exception will be ignored, but the semaphore will lose its concurrency limiting capability
+  - Only used in special scenarios, typically when calling async functions in a multi-threaded environment
 
-使用方法
-
-以下是如何使用 with_adaptive_retry 装饰器的示例：
+Usage Example:
 
 ```python
 from adaptio import with_adaptive_retry, ServiceOverloadError
 import asyncio
 import random
 
-# 设计一个达到 16 并发就会触发 ServiceOverloadError 的测试任务
+# Design a test task that triggers ServiceOverloadError at 16 concurrency
 sample_task_overload_threshold = 16
 sample_task_running_count = 0
 
@@ -69,9 +69,9 @@ async def sample_task(task_id):
     """A sample task that simulates workload and triggers overload at a certain concurrency."""
     global sample_task_running_count
     sample_task_running_count += 1
-    # 模拟随机任务耗时
+    # Simulate random task duration
     await asyncio.sleep(random.uniform(1, 3))
-    # 模拟过载错误
+    # Simulate overload error
     if sample_task_running_count > sample_task_overload_threshold:
         sample_task_running_count -= 1
         raise ServiceOverloadError(
@@ -81,12 +81,12 @@ async def sample_task(task_id):
         sample_task_running_count -= 1
     return f"Task {task_id} done"
 
-# 方法1：使用默认配置
+# Method 1: Using default configuration
 @with_adaptive_retry()
 async def sample_task_with_retry(task_id):
     return await sample_task(task_id)
 
-# 方法2：自定义配置参数
+# Method 2: Custom configuration parameters
 @with_adaptive_retry(
     max_retries=512,
     retry_interval_seconds=3,
@@ -98,8 +98,8 @@ async def sample_task_with_retry(task_id):
 async def sample_task_with_custom_retry(task_id):
     return await sample_task(task_id)
 
-# 方法3：使用自定义调度器（多个函数共享）
-# 创建一个共享的调度器实例
+# Method 3: Using custom scheduler (shared between multiple functions)
+# Create a shared scheduler instance
 from adaptio import AdaptiveAsyncConcurrencyLimiter
 
 shared_scheduler = AdaptiveAsyncConcurrencyLimiter(
@@ -109,7 +109,7 @@ shared_scheduler = AdaptiveAsyncConcurrencyLimiter(
     adjust_overload_rate=0.15
 )
 
-# 多个函数共享同一个调度器
+# Multiple functions sharing the same scheduler
 @with_adaptive_retry(scheduler=shared_scheduler)
 async def task_type_a(task_id):
     return await sample_task(task_id)
@@ -118,26 +118,26 @@ async def task_type_a(task_id):
 async def task_type_b(task_id):
     return await sample_task(task_id)
 
-# 运行示例任务
+# Run example tasks
 async def main():
-    print("=== 测试方法1：使用默认配置 ===")
+    print("=== Testing Method 1: Using default configuration ===")
     tasks1 = [sample_task_with_retry(i) for i in range(100)]
     for result in asyncio.as_completed(tasks1):
         try:
             print(await result)
         except Exception as e:
-            print(f"任务失败: {e}")
+            print(f"Task failed: {e}")
 
-    print("\n=== 测试方法2：使用自定义配置 ===")
+    print("\n=== Testing Method 2: Using custom configuration ===")
     tasks2 = [sample_task_with_custom_retry(i) for i in range(100)]
     for result in asyncio.as_completed(tasks2):
         try:
             print(await result)
         except Exception as e:
-            print(f"任务失败: {e}")
+            print(f"Task failed: {e}")
 
-    print("\n=== 测试方法3：使用共享调度器 ===")
-    # 混合运行不同类型的任务，它们会共享并发限制
+    print("\n=== Testing Method 3: Using shared scheduler ===")
+    # Mix different types of tasks, they will share concurrency limits
     tasks3 = []
     for i in range(100):
         if i % 2 == 0:
@@ -149,38 +149,38 @@ async def main():
         try:
             print(await result)
         except Exception as e:
-            print(f"任务失败: {e}")
+            print(f"Task failed: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-解释
+Explanation:
 
-- 自动重试：当任务因 ServiceOverloadError 失败时会自动重试
-- 配置方式：示例展示了三种不同的配置方式
-  1. 使用默认配置（每个函数独立的调度器）
-  2. 通过装饰器参数自定义配置（每个函数独立的调度器）
-  3. 使用自定义的调度器实例
-     - 可以让多个不同的函数共享同一个调度器
-     - 共享调度器的函数会共同受到并发限制
-     - 适用于需要统一管理多个相关函数资源使用的场景
-- 任务管理：调度器会根据系统负载自动调整并发数，避免持续过载
+- Automatic Retry: Tasks are automatically retried when they fail due to ServiceOverloadError
+- Configuration Methods: The example shows three different configuration methods:
+  1. Using default configuration (independent scheduler per function)
+  2. Custom configuration through decorator parameters (independent scheduler per function)
+  3. Using a custom scheduler instance
+     - Allows multiple different functions to share the same scheduler
+     - Functions sharing the scheduler are subject to shared concurrency limits
+     - Suitable for scenarios requiring unified management of resource usage across multiple related functions
+- Task Management: The scheduler automatically adjusts concurrency based on system load to avoid continuous overload
 
-使用建议
+Usage Recommendations:
 
-- 如果多个函数访问相同的资源（如同一个API或数据库），建议使用共享调度器来统一管理并发
-- 如果函数之间完全独立，可以使用默认配置或独立的自定义配置
-- 共享调度器可以更精确地控制整体系统负载，避免资源过度使用
+- If multiple functions access the same resources (like the same API or database), it's recommended to use a shared scheduler for unified concurrency management
+- If functions are completely independent, you can use default configuration or independent custom configuration
+- Shared schedulers can more precisely control overall system load and prevent resource overuse
 
-## 装饰 aiohttp 请求函数
+## Decorating aiohttp Request Functions
 
-raise_on_aiohttp_overload 装饰器用于将 aiohttp 的特定HTTP状态码转换为 ServiceOverloadError 异常,便于与动态任务调度器集成。
+The `raise_on_aiohttp_overload` decorator is used to convert specific HTTP status codes from aiohttp into ServiceOverloadError exceptions, making it easier to integrate with dynamic task schedulers.
 
-装饰器参数:
-- overload_status_codes (可选): 要转换为过载异常的HTTP状态码列表,默认为 (503, 429)
+Decorator Parameters:
+- overload_status_codes (optional): List of HTTP status codes to convert to overload exceptions, defaults to (503, 429)
 
-使用示例:
+Usage Example:
 
 ```python
 from adaptio import with_adaptive_retry, raise_on_aiohttp_overload
@@ -193,140 +193,140 @@ async def fetch_data(session: aiohttp.ClientSession, url: str):
         response.raise_for_status()
         return await response.json()
 
-# 组合使用示例
+# Combined usage example
 async def main(data_id: str):
     async with aiohttp.ClientSession() as session:
         try:
             data = await fetch_data(session, f"http://api.example.com/data/{data_id}")
-            print(f"获取数据成功: {data}")
+            print(f"Data retrieved successfully: {data}")
         except Exception as e:
-            print(f"获取数据失败: {data_id=} {e}")
+            print(f"Failed to retrieve data: {data_id=} {e}")
 
 if __name__ == "__main__":
     asyncio.run(asyncio.gather(*(main(data_id) for data_id in range(100))))
 ```
 
-说明:
-- 当请求返回 503(Service Unavailable) 或 429(Too Many Requests) 状态码时,装饰器会将其转换为 ServiceOverloadError
-- 可以与 with_adaptive_retry 装饰器组合使用,实现自动重试功能
-- 支持自定义需要转换的状态码列表
+Notes:
+- When a request returns 503 (Service Unavailable) or 429 (Too Many Requests) status codes, the decorator converts them to ServiceOverloadError
+- Can be combined with the with_adaptive_retry decorator for automatic retry functionality
+- Supports customizing the list of status codes to convert
 
-使用建议:
-- 建议将此装饰器与 with_adaptive_retry 组合使用,以实现完整的过载处理
-- 可以根据目标 API 的特点自定义过载状态码
-- 装饰器的顺序很重要,raise_on_aiohttp_overload 应该在内层
+Usage Recommendations:
+- It's recommended to combine this decorator with with_adaptive_retry for complete overload handling
+- You can customize the overload status codes based on the target API's characteristics
+- The order of decorators is important, raise_on_aiohttp_overload should be the inner decorator
 
-## 异步控制装饰器：with_async_control
+## Async Control Decorator: with_async_control
 
-该装饰器提供了全面的异步操作控制方案，支持并发数限制、QPS控制和重试机制。
+This decorator provides a comprehensive async operation control solution, supporting concurrency limits, QPS control, and retry mechanisms.
 
-装饰器参数：
+Decorator Parameters:
 
-- exception_type：要捕获的异常类型，默认为 Exception
-- max_concurrency：最大并发数，默认为 0（不限制）
-- max_qps：每秒最大请求数，默认为 0（不限制）
-- retry_n：重试次数，默认为 3 次
-- retry_delay：重试间隔时间（秒），默认为 1.0 秒
+- exception_type: Exception type to catch, defaults to Exception
+- max_concurrency: Maximum concurrency, defaults to 0 (no limit)
+- max_qps: Maximum requests per second, defaults to 0 (no limit)
+- retry_n: Number of retries, defaults to 3
+- retry_delay: Retry interval in seconds, defaults to 1.0
 
-使用示例：
+Usage Example:
 
 ```python
 from adaptio import with_async_control
 import asyncio
 
 @with_async_control(
-    exception_type=ValueError,  # 只捕获 ValueError
-    max_concurrency=5,    # 最多5个并发
-    max_qps=10,       # 每秒最多10个请求
-    retry_n=2,        # 失败后重试2次
-    retry_delay=0.5   # 重试间隔0.5秒
+    exception_type=ValueError,  # Only catch ValueError
+    max_concurrency=5,    # Maximum 5 concurrent tasks
+    max_qps=10,       # Maximum 10 requests per second
+    retry_n=2,        # Retry 2 times after failure
+    retry_delay=0.5   # Retry interval 0.5 seconds
 )
 async def api_call(i: int) -> str:
-    # 模拟API调用
+    # Simulate API call
     await asyncio.sleep(1.0)
-    return f"请求 {i} 成功"
+    return f"Request {i} successful"
 
 async def main():
-    # 创建多个并发任务
+    # Create multiple concurrent tasks
     tasks = [api_call(i) for i in range(10)]
 
-    # 等待所有任务完成
+    # Wait for all tasks to complete
     results = await asyncio.gather(*tasks)
     for i, result in enumerate(results):
-        print(f"任务 {i}: {result}")
+        print(f"Task {i}: {result}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-使用场景：
+Usage Scenarios:
 
-- API调用限流：控制对外部服务的请求频率
-- 资源访问控制：限制对数据库或其他共享资源的并发访问
-- 简单重试需求：处理临时性故障的场景
+- API Call Rate Limiting: Control request frequency to external services
+- Resource Access Control: Limit concurrent access to databases or other shared resources
+- Simple Retry Requirements: Handle temporary failure scenarios
 
-与 with_adaptive_retry 的区别：
+Differences from with_adaptive_retry:
 
-- with_async_control 更适合固定的并发控制场景
-- with_adaptive_retry 提供动态的负载自适应能力
-- 根据实际需求选择合适的装饰器
+- with_async_control is more suitable for fixed concurrency control scenarios
+- with_adaptive_retry provides dynamic load adaptation capabilities
+- Choose the appropriate decorator based on actual requirements
 
-## 开发指南
+## Development Guide
 
-### 环境设置
+### Environment Setup
 
-1. 克隆仓库并创建虚拟环境：
+1. Clone the repository and create a virtual environment:
 ```bash
 git clone https://github.com/Haskely/adaptio.git
 cd adaptio
 python3.10 -m venv .venv --prompt adaptio
 source .venv/bin/activate  # Linux/macOS
-# 或
+# or
 .venv\Scripts\activate  # Windows
 ```
 
-2. 安装开发依赖：
+2. Install development dependencies:
 ```bash
 pip install -e ".[dev]"
 pre-commit install
 ```
 
-### 代码规范
+### Code Standards
 
-本项目使用多个工具确保代码质量：
+This project uses multiple tools to ensure code quality:
 
-1. Ruff：用于代码格式化和 lint
-   - 自动修复：`ruff check --fix .`
-   - 格式化：`ruff format .`
+1. Ruff: For code formatting and linting
+   - Auto-fix: `ruff check --fix .`
+   - Format: `ruff format .`
 
-2. MyPy：用于静态类型检查
-   - 本项目启用了严格的类型检查，包括：
-     - 禁止未类型化的函数定义
-     - 禁止未完成的函数定义
-     - 禁止未类型化的装饰器
-     - 强制可选类型显式声明
-   - 运行检查：`mypy .`
+2. MyPy: For static type checking
+   - The project enables strict type checking, including:
+     - Prohibiting untyped function definitions
+     - Prohibiting incomplete function definitions
+     - Prohibiting untyped decorators
+     - Enforcing explicit optional type declarations
+   - Run checks: `mypy .`
 
-3. Pre-commit hooks：
-   - 提交前自动运行以下检查：
-     - Ruff 检查和格式化
-     - MyPy 类型检查
-     - 尾随空格检查
-     - 文件结尾空行检查
-     - 单元测试
+3. Pre-commit hooks:
+   - Automatically run the following checks before commit:
+     - Ruff checks and formatting
+     - MyPy type checking
+     - Trailing whitespace check
+     - File end newline check
+     - Unit tests
 
-### 测试
+### Testing
 
-运行单元测试：
+Run unit tests:
 ```bash
 python -m unittest discover tests
 ```
 
-### 类型提示
+### Type Hints
 
-本项目完全支持类型提示，并包含 `py.typed` 标记文件。使用者可以在他们的项目中获得完整的类型检查支持。
+This project fully supports type hints and includes a `py.typed` marker file. Users can get complete type checking support in their projects.
 
-示例：
+Example:
 ```python
 from adaptio import AdaptiveAsyncConcurrencyLimiter
 from typing import AsyncIterator
@@ -340,33 +340,33 @@ async def process_items(items: AsyncIterator[str]) -> None:
         await scheduler.submit(process_item(item))
 ```
 
-### 发布新版本
+### Releasing a New Version
 
-1. 更新版本号（使用 git tag）：
+1. Update version number (using git tag):
 ```bash
 cz bump
 git push
 git push --tags
 ```
 
-2. CI/CD 将自动：
-   - 运行测试
-   - 构建包
-   - 发布到 PyPI
+2. CI/CD will automatically:
+   - Run tests
+   - Build package
+   - Publish to PyPI
 
-## 常见问题
+## FAQ
 
-### Q: 如何选择合适的初始并发数？
-A: 建议从较小的值开始（如4-8），让系统自动调节到最优值。过大的初始值可能导致系统启动时出现过载。
+### Q: How to choose the appropriate initial concurrency?
+A: It's recommended to start with a small value (like 4-8) and let the system automatically adjust to the optimal value. Too large an initial value may cause system overload at startup.
 
-### Q: 不同装饰器的使用场景？
+### Q: Usage scenarios for different decorators?
 A:
-- `with_adaptive_retry`: 适合需要动态调节并发的场景，特别是负载变化较大的情况
-- `with_async_control`: 适合需要固定并发限制和QPS控制的场景
-- `raise_on_aiohttp_overload`: 专门用于处理HTTP请求的过载情况
+- `with_adaptive_retry`: Suitable for scenarios requiring dynamic concurrency adjustment, especially when load varies significantly
+- `with_async_control`: Suitable for scenarios requiring fixed concurrency limits and QPS control
+- `raise_on_aiohttp_overload`: Specifically for handling HTTP request overload situations
 
-### Q: 如何监控系统运行状态？
-A: 可以通过设置 `log_level="DEBUG"` 来查看详细的调节过程，或者直接访问调度器的属性如 `current_concurrency` 获取运行时状态。
+### Q: How to monitor system runtime status?
+A: You can view detailed adjustment process by setting `log_level="DEBUG"`, or directly access scheduler properties like `current_concurrency` to get runtime status.
 
-### Q: 什么情况下需要使用 `ignore_loop_bound_exception` 参数？
-A: 这个参数主要用于处理在多线程环境中使用异步代码的特殊情况。如果你在一个线程中初始化信号量，然后在另一个线程中的异步函数中使用它，可能会遇到"is bound to a different event loop"的错误。通常情况下，这表明代码设计有问题，应该修复异步/同步交互的逻辑。但在某些无法避免的情况下，可以设置该参数为 True 来忽略异常，但需要注意这会导致并发控制失效。大多数应用不需要设置此参数。
+### Q: When to use the `ignore_loop_bound_exception` parameter?
+A: This parameter is mainly used to handle special cases when using async code in a multi-threaded environment. If you initialize a semaphore in one thread and then use it in an async function in another thread, you might encounter the "is bound to a different event loop" error. Usually, this indicates a design issue in the code, and the async/sync interaction logic should be fixed. However, in some unavoidable cases, you can set this parameter to True to ignore the exception, but note that this will cause concurrency control to fail. Most applications don't need to set this parameter.
