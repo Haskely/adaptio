@@ -1,9 +1,13 @@
 import functools
-import inspect
 from collections.abc import Callable, Iterable
 from typing import Any, ParamSpec, TypeVar, cast
 
 from .adaptive_async_concurrency_limiter import ServiceOverloadError
+from .decorator_utils import (
+    is_async_generator_function,
+    rewrap_static_class_method,
+    unwrap_static_class_method,
+)
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -34,6 +38,10 @@ def raise_on_overload(
     - 普通异步函数 (async def func() -> T): 对函数调用进行异常转换
     - 异步生成器 (async def func() -> AsyncGenerator[T, None]): 对生成器迭代进行异常转换
 
+    支持与 @staticmethod 和 @classmethod 装饰器组合使用，且兼容两种装饰器顺序：
+    - 推荐顺序：@staticmethod/@classmethod 在上，@raise_on_overload 在下
+    - 也支持：@raise_on_overload 在上，@staticmethod/@classmethod 在下
+
     Args:
         overload_keywords: 要视为过载的关键词元组，默认为 OVERLOAD_KEYWORDS
         cared_exception: 需要捕获的异常类型或者一个输入为异常对象的函数
@@ -59,6 +67,20 @@ def raise_on_overload(
                 data = await fetch_page(f"{base_url}?page={page}")
                 for item in data:
                     yield item
+
+        # 与 @staticmethod 组合使用（两种顺序都支持）
+        class API:
+            # 推荐方式
+            @staticmethod
+            @raise_on_overload()
+            async def fetch_static():
+                ...
+
+            # 也支持
+            @raise_on_overload()
+            @staticmethod
+            async def fetch_alt():
+                ...
         ```
     """
     if not isinstance(cared_exception, Iterable):
@@ -77,14 +99,17 @@ def raise_on_overload(
         return False
 
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        # 🔍 兼容性处理：检测是否被 staticmethod/classmethod 包装
+        actual_func, is_static, is_class = unwrap_static_class_method(func)
+
         # 🔍 关键：检测函数类型
-        is_async_gen = inspect.isasyncgenfunction(func)
+        is_async_gen = is_async_generator_function(func)
 
         if is_async_gen:
             # ========== 异步生成器处理逻辑 ==========
-            @functools.wraps(func)
+            @functools.wraps(actual_func)  # type: ignore[arg-type]
             async def generator_wrapper(*args: Any, **kwargs: Any):
-                generator = func(*args, **kwargs)
+                generator = actual_func(*args, **kwargs)  # type: ignore[misc,operator]
                 try:
                     async for item in generator:
                         try:
@@ -107,14 +132,18 @@ def raise_on_overload(
                             raise ServiceOverloadError(e) from e
                     raise e
 
-            return cast(Callable[P, T], generator_wrapper)
+            # 如果原来是 staticmethod/classmethod，需要重新包装
+            return cast(
+                Callable[P, T],
+                rewrap_static_class_method(generator_wrapper, is_static, is_class),
+            )  # type: ignore[arg-type]
 
         else:
             # ========== 普通异步函数处理逻辑 ==========
-            @functools.wraps(func)
+            @functools.wraps(actual_func)  # type: ignore[arg-type]
             async def function_wrapper(*args: Any, **kwargs: Any) -> T:
                 try:
-                    return await func(*args, **kwargs)  # type: ignore[misc]
+                    return await actual_func(*args, **kwargs)  # type: ignore[misc]
                 except Exception as e:
                     if is_cared_exception(e):
                         exception_str = str(e)
@@ -124,6 +153,10 @@ def raise_on_overload(
                             raise ServiceOverloadError(e) from e
                     raise e
 
-            return cast(Callable[P, T], function_wrapper)
+            # 如果原来是 staticmethod/classmethod，需要重新包装
+            return cast(
+                Callable[P, T],
+                rewrap_static_class_method(function_wrapper, is_static, is_class),
+            )  # type: ignore[arg-type]
 
     return decorator

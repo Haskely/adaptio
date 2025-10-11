@@ -11,6 +11,7 @@ wheels/
 
 # temp dir
 .test_task
+.study
 
 # mypy
 .mypy_cache

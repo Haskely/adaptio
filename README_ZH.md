@@ -333,6 +333,67 @@ if __name__ == "__main__":
 - 可以根据目标 API 的特点自定义过载状态码
 - 装饰器的顺序很重要,raise_on_aiohttp_overload 应该在内层
 
+## 装饰器与 staticmethod/classmethod 的兼容性
+
+所有 adaptio 提供的装饰器现已完全支持与 `@staticmethod` 和 `@classmethod` 组合使用，并且**兼容两种装饰器顺序**！
+
+### 支持的装饰器
+
+- ✅ `raise_on_overload` - 过载关键词检测
+- ✅ `raise_on_aiohttp_overload` - HTTP 状态码检测
+- ✅ `with_async_control` - 并发和重试控制
+- ✅ `with_adaptive_retry` - 自适应重试
+
+### 使用示例
+
+```python
+from adaptio import raise_on_overload, with_async_control
+
+class APIClient:
+    # ✅ 推荐方式：@staticmethod 在上，装饰器在下
+    @staticmethod
+    @raise_on_overload()
+    async def fetch_data(url: str):
+        # ... 实现 ...
+        pass
+
+    # ✅ 也支持：装饰器在上，@staticmethod 在下
+    @raise_on_overload()
+    @staticmethod
+    async def fetch_data_alt(url: str):
+        # ... 实现 ...
+        pass
+
+    # ✅ classmethod 同样支持
+    @classmethod
+    @with_async_control(max_concurrency=5)
+    async def batch_fetch(cls, urls: list):
+        # ... 实现 ...
+        pass
+
+    # ✅ 异步生成器也完全支持
+    @staticmethod
+    @raise_on_overload()
+    async def stream_data(count: int):
+        for i in range(count):
+            yield i
+```
+
+### 实现原理
+
+装饰器会自动检测并处理 `staticmethod` 和 `classmethod`：
+1. 使用 `func.__func__` 提取被包装的原始函数
+2. 对原始函数进行处理（异常转换、重试等）
+3. 重新应用 `staticmethod` 或 `classmethod` 装饰
+
+这确保了无论装饰器顺序如何，都能正常工作。
+
+### 使用建议
+
+- **推荐顺序**：`@staticmethod/@classmethod` 在上，其他装饰器在下（更符合直觉）
+- **也支持**：其他装饰器在上，`@staticmethod/@classmethod` 在下（完全兼容）
+- 两种顺序在功能上完全等价，选择你喜欢的方式即可
+
 ## 异步控制装饰器：with_async_control
 
 该装饰器提供了全面的异步操作控制方案，支持并发数限制、QPS控制和重试机制。

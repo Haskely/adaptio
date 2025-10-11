@@ -1,11 +1,15 @@
 import functools
-import inspect
 from collections.abc import Callable
 from typing import Any, ParamSpec, TypeVar, cast
 
 import aiohttp
 
 from .adaptive_async_concurrency_limiter import ServiceOverloadError
+from .decorator_utils import (
+    is_async_generator_function,
+    rewrap_static_class_method,
+    unwrap_static_class_method,
+)
 
 OVERLOAD_STATUS_CODES = (503, 429)
 
@@ -54,14 +58,17 @@ def raise_on_aiohttp_overload(
     """
 
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        # 🔍 兼容性处理：检测是否被 staticmethod/classmethod 包装
+        actual_func, is_static, is_class = unwrap_static_class_method(func)
+
         # 🔍 关键：检测函数类型
-        is_async_gen = inspect.isasyncgenfunction(func)
+        is_async_gen = is_async_generator_function(func)
 
         if is_async_gen:
             # ========== 异步生成器处理逻辑 ==========
-            @functools.wraps(func)
+            @functools.wraps(actual_func)  # type: ignore[arg-type]
             async def generator_wrapper(*args: Any, **kwargs: Any):
-                generator = func(*args, **kwargs)
+                generator = actual_func(*args, **kwargs)  # type: ignore[misc,operator]
                 try:
                     async for item in generator:
                         try:
@@ -75,19 +82,27 @@ def raise_on_aiohttp_overload(
                         raise ServiceOverloadError(e) from e
                     raise e
 
-            return cast(Callable[P, T], generator_wrapper)
+            # 如果原来是 staticmethod/classmethod，需要重新包装
+            return cast(
+                Callable[P, T],
+                rewrap_static_class_method(generator_wrapper, is_static, is_class),
+            )  # type: ignore[arg-type]
 
         else:
             # ========== 普通异步函数处理逻辑 ==========
-            @functools.wraps(func)
+            @functools.wraps(actual_func)  # type: ignore[arg-type]
             async def function_wrapper(*args: Any, **kwargs: Any) -> T:
                 try:
-                    return await func(*args, **kwargs)  # type: ignore[misc]
+                    return await actual_func(*args, **kwargs)  # type: ignore[misc]
                 except aiohttp.ClientResponseError as e:
                     if e.status in overload_status_codes:
                         raise ServiceOverloadError(e) from e
                     raise e
 
-            return cast(Callable[P, T], function_wrapper)
+            # 如果原来是 staticmethod/classmethod，需要重新包装
+            return cast(
+                Callable[P, T],
+                rewrap_static_class_method(function_wrapper, is_static, is_class),
+            )  # type: ignore[arg-type]
 
     return decorator

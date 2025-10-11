@@ -216,6 +216,67 @@ Usage Recommendations:
 - You can customize the overload status codes based on the target API's characteristics
 - The order of decorators is important, raise_on_aiohttp_overload should be the inner decorator
 
+## Decorator Compatibility with staticmethod/classmethod
+
+All decorators provided by adaptio now fully support combination with `@staticmethod` and `@classmethod`, and are **compatible with both decorator orders**!
+
+### Supported Decorators
+
+- ✅ `raise_on_overload` - Overload keyword detection
+- ✅ `raise_on_aiohttp_overload` - HTTP status code detection
+- ✅ `with_async_control` - Concurrency and retry control
+- ✅ `with_adaptive_retry` - Adaptive retry
+
+### Usage Examples
+
+```python
+from adaptio import raise_on_overload, with_async_control
+
+class APIClient:
+    # ✅ Recommended: @staticmethod on top, decorator below
+    @staticmethod
+    @raise_on_overload()
+    async def fetch_data(url: str):
+        # ... implementation ...
+        pass
+
+    # ✅ Also supported: decorator on top, @staticmethod below
+    @raise_on_overload()
+    @staticmethod
+    async def fetch_data_alt(url: str):
+        # ... implementation ...
+        pass
+
+    # ✅ classmethod also supported
+    @classmethod
+    @with_async_control(max_concurrency=5)
+    async def batch_fetch(cls, urls: list):
+        # ... implementation ...
+        pass
+
+    # ✅ Async generators fully supported
+    @staticmethod
+    @raise_on_overload()
+    async def stream_data(count: int):
+        for i in range(count):
+            yield i
+```
+
+### Implementation
+
+The decorators automatically detect and handle `staticmethod` and `classmethod`:
+1. Extract the original function using `func.__func__`
+2. Process the original function (exception conversion, retry, etc.)
+3. Reapply `staticmethod` or `classmethod` decoration
+
+This ensures proper functionality regardless of decorator order.
+
+### Recommendations
+
+- **Recommended order**: `@staticmethod/@classmethod` on top, other decorators below (more intuitive)
+- **Also supported**: Other decorators on top, `@staticmethod/@classmethod` below (fully compatible)
+- Both orders are functionally equivalent, choose whichever you prefer
+
 ## Async Control Decorator: with_async_control
 
 This decorator provides a comprehensive async operation control solution, supporting concurrency limits, QPS control, and retry mechanisms.

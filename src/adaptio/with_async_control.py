@@ -1,9 +1,13 @@
 import asyncio
-import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
+from adaptio.decorator_utils import (
+    is_async_generator_function,
+    rewrap_static_class_method,
+    unwrap_static_class_method,
+)
 from adaptio.log_utils import setup_colored_logger
 
 P = ParamSpec("P")
@@ -80,12 +84,15 @@ def with_async_control(
         )
         qps_lock = asyncio.Lock()
 
+        # 🔍 兼容性处理：检测是否被 staticmethod/classmethod 包装
+        actual_func, is_static, is_class = unwrap_static_class_method(func)
+
         # 🔍 关键：检测函数类型
-        is_async_gen = inspect.isasyncgenfunction(func)
+        is_async_gen = is_async_generator_function(func)
 
         if is_async_gen:
             # ========== 异步生成器处理逻辑 ==========
-            @wraps(func)
+            @wraps(actual_func)  # type: ignore[arg-type]
             async def generator_wrapper(*args, **kwargs):
                 async with concurrency_sem:
                     for attempt in range(retry_n + 1):
@@ -95,7 +102,7 @@ def with_async_control(
                                     await asyncio.sleep(1 / max_qps)
 
                             # 创建并迭代生成器
-                            generator = func(*args, **kwargs)
+                            generator = actual_func(*args, **kwargs)  # type: ignore[misc,operator]
                             item_count = 0
 
                             async for item in generator:
@@ -104,7 +111,7 @@ def with_async_control(
 
                             # 成功完成
                             logger.debug(
-                                f"{func.__name__} -- 生成器成功完成，产出 {item_count} 个项目"
+                                f"{actual_func.__name__} -- 生成器成功完成，产出 {item_count} 个项目"
                             )
                             return  # 成功退出
 
@@ -118,12 +125,12 @@ def with_async_control(
                                 raise
 
                             logger.error(
-                                f"（{attempt + 1}/{retry_n}） 尝试生成器 {func.__name__} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"
+                                f"（{attempt + 1}/{retry_n}） 尝试生成器 {actual_func.__name__} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"
                             )
 
                             if attempt >= retry_n:
                                 logger.error(
-                                    f"（{attempt + 1}/{retry_n}） 尝试生成器 {func.__name__} 达到最大次数！"
+                                    f"（{attempt + 1}/{retry_n}） 尝试生成器 {actual_func.__name__} 达到最大次数！"
                                 )
                                 raise
 
@@ -132,11 +139,12 @@ def with_async_control(
 
                 raise Exception("所有重试都失败了")
 
-            return generator_wrapper
+            # 如果原来是 staticmethod/classmethod，需要重新包装
+            return rewrap_static_class_method(generator_wrapper, is_static, is_class)  # type: ignore[return-value]
 
         else:
             # ========== 普通异步函数处理逻辑（保持原有实现）==========
-            @wraps(func)
+            @wraps(actual_func)  # type: ignore[arg-type]
             async def function_wrapper(*args, **kwargs):
                 async with concurrency_sem:
                     for attempt in range(retry_n + 1):
@@ -144,7 +152,7 @@ def with_async_control(
                             if max_qps > 1e-5:  # 避免浮点数精度问题
                                 async with qps_lock:
                                     await asyncio.sleep(1 / max_qps)
-                            return await func(*args, **kwargs)
+                            return await actual_func(*args, **kwargs)  # type: ignore[misc]
                         except Exception as e:
                             if retry_n <= 0:
                                 raise
@@ -154,17 +162,18 @@ def with_async_control(
                             elif not isinstance(e, cared_exception):
                                 raise
                             logger.error(
-                                f"（{attempt + 1}/{retry_n}） 尝试 {func.__name__} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"
+                                f"（{attempt + 1}/{retry_n}） 尝试 {actual_func.__name__} 失败: \n Class: {e.__class__.__name__}\n Message: {e}"
                             )
                             if attempt >= retry_n:
                                 logger.error(
-                                    f"（{attempt + 1}/{retry_n}） 尝试 {func.__name__} 达到最大次数！"
+                                    f"（{attempt + 1}/{retry_n}） 尝试 {actual_func.__name__} 达到最大次数！"
                                 )
                                 raise
                             await asyncio.sleep(retry_delay)
                     raise Exception("所有重试都失败了")
 
-            return function_wrapper
+            # 如果原来是 staticmethod/classmethod，需要重新包装
+            return rewrap_static_class_method(function_wrapper, is_static, is_class)  # type: ignore[return-value]
 
     return decorator
 

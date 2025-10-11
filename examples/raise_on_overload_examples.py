@@ -79,7 +79,55 @@ async def stream_data_with_aiohttp(
 
 
 # ============================================================================
-# 示例 5: 自定义过载关键词
+# 示例 5: 与 @staticmethod 和 @classmethod 组合使用
+# ============================================================================
+class APIClient:
+    """演示 raise_on_overload 与类方法装饰器的组合使用"""
+
+    # 方式1: @staticmethod 在上，@raise_on_overload 在下（推荐）
+    @staticmethod
+    @raise_on_overload()
+    async def static_fetch(url: str) -> dict:
+        """静态方法：获取数据"""
+        await asyncio.sleep(0.1)
+        if "overload" in url:
+            raise RuntimeError("service overload")
+        return {"url": url, "method": "static"}
+
+    # 方式2: @raise_on_overload 在上，@staticmethod 在下（也支持）
+    @raise_on_overload()
+    @staticmethod
+    async def static_fetch_alt(url: str) -> dict:
+        """静态方法：获取数据（反向装饰器顺序）"""
+        await asyncio.sleep(0.1)
+        if "overload" in url:
+            raise RuntimeError("service overload")
+        return {"url": url, "method": "static_alt"}
+
+    # classmethod 示例
+    @classmethod
+    @raise_on_overload()
+    async def class_fetch(cls, url: str) -> dict:
+        """类方法：获取数据"""
+        await asyncio.sleep(0.1)
+        if "overload" in url:
+            raise RuntimeError("service overload")
+        return {"url": url, "method": "class", "class_name": cls.__name__}
+
+    # 静态方法的异步生成器
+    @staticmethod
+    @raise_on_overload()
+    async def static_stream(count: int, fail_at: int = -1) -> AsyncGenerator[int, None]:
+        """静态方法：流式返回数据"""
+        for i in range(count):
+            await asyncio.sleep(0.1)
+            if i == fail_at:
+                raise RuntimeError("too many requests")
+            yield i
+
+
+# ============================================================================
+# 示例 6: 自定义过载关键词
 # ============================================================================
 @raise_on_overload(overload_keywords=("系统繁忙", "请稍后"))
 async def custom_keywords_function(task_id: str) -> str:
@@ -130,6 +178,34 @@ async def main():
     print("=" * 80)
     print("演示 raise_on_overload 和 raise_on_aiohttp_overload 统一装饰器方案")
     print("=" * 80)
+
+    # 示例 0: 类方法装饰器组合
+    print("\n0️⃣  测试 @staticmethod/@classmethod 组合")
+    try:
+        result = await APIClient.static_fetch("https://api.example.com")
+        print(f"✅ 静态方法成功: {result}")
+    except ServiceOverloadError as e:
+        print(f"❌ 静态方法过载: {e}")
+
+    try:
+        result = await APIClient.static_fetch_alt("https://api.example.com")
+        print(f"✅ 静态方法（反向顺序）成功: {result}")
+    except ServiceOverloadError as e:
+        print(f"❌ 静态方法过载: {e}")
+
+    try:
+        result = await APIClient.class_fetch("https://api.example.com")
+        print(f"✅ 类方法成功: {result}")
+    except ServiceOverloadError as e:
+        print(f"❌ 类方法过载: {e}")
+
+    try:
+        items = []
+        async for item in APIClient.static_stream(5):
+            items.append(item)
+        print(f"✅ 静态生成器成功: 收到 {len(items)} 项数据")
+    except ServiceOverloadError as e:
+        print(f"❌ 静态生成器过载: {e}")
 
     # 示例 1: 普通异步函数成功
     print("\n1️⃣  测试普通异步函数 - 成功情况")
@@ -202,6 +278,8 @@ async def main():
     print("✨ 统一装饰器方案的优势:")
     print("   ✅ 一个装饰器同时支持普通函数和生成器")
     print("   ✅ 自动检测函数类型，无需手动选择")
+    print("   ✅ 支持与 @staticmethod/@classmethod 组合使用")
+    print("   ✅ 装饰器顺序兼容：两种顺序都支持")
     print("   ✅ 代码更简洁，用户体验更好")
     print("   ✅ 类型安全，IDE 提示友好")
     print("=" * 80)
