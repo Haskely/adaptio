@@ -5,7 +5,11 @@ from adaptio import with_async_control
 
 
 class TestWithAsyncControl(unittest.TestCase):
-    def setUp(self):
+    def __init__(self, *args: str, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.loop: asyncio.AbstractEventLoop
+
+    def setUp(self) -> None:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
@@ -14,16 +18,16 @@ class TestWithAsyncControl(unittest.TestCase):
 
     def test_with_async_control(self):
         async def test_control():
-            executed_tasks = []
+            executed_tasks: list[int] = []
 
             @with_async_control(max_concurrency=2)
-            async def controlled_task(task_id):
+            async def controlled_task(task_id: int) -> int:
                 executed_tasks.append(task_id)
                 await asyncio.sleep(0.1)
                 return task_id
 
             tasks = [controlled_task(i) for i in range(5)]
-            results = await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks)  # type: ignore[arg-type]
 
             self.assertEqual(len(results), 5)
             self.assertEqual(set(results), {0, 1, 2, 3, 4})

@@ -1,4 +1,6 @@
 {
     "venvPath": ".",
     "venv": ".venv",
+    "typeCheckingMode": "standard",
+    "reportUnknownArgumentType": "error"
 }

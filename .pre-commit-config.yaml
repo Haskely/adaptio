@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.11.2
+    rev: v0.14.0
     hooks:
       - id: ruff
         args: [--fix]
@@ -15,7 +15,7 @@ repos:
           - jupyter
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -29,7 +29,7 @@ repos:
           - javascript
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.4.1
+    rev: v4.9.1
     hooks:
       - id: commitizen
       - id: commitizen-branch
@@ -37,16 +37,16 @@ repos:
           - pre-push
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.1
+    rev: v3.21.0
     hooks:
       - id: pyupgrade
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.24.2
+    rev: v8.28.0
     hooks:
       - id: gitleaks
 
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.398
+  - repo: https://github.com/DetachHead/basedpyright-pre-commit-mirror
+    rev: 1.31.6 # or whatever the latest version is at the time
     hooks:
-      - id: pyright
+        - id: basedpyright

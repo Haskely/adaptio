@@ -5,7 +5,11 @@ from adaptio import AdaptiveAsyncConcurrencyLimiter
 
 
 class TestAdaptiveConcurrencyLimiter(unittest.TestCase):
-    def setUp(self):
+    def __init__(self, *args: str, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.loop: asyncio.AbstractEventLoop
+
+    def setUp(self) -> None:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
@@ -20,7 +24,7 @@ class TestAdaptiveConcurrencyLimiter(unittest.TestCase):
             start_time = asyncio.get_event_loop().time()
             execution_times = []
 
-            async def sample_task(task_id):
+            async def sample_task(task_id: int) -> int:
                 task_start = asyncio.get_event_loop().time()
                 await asyncio.sleep(0.1)  # 增加延迟以便观察并发效果
                 execution_times.append(asyncio.get_event_loop().time() - task_start)

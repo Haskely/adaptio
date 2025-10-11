@@ -6,7 +6,11 @@ from adaptio import AdjustableSemaphore
 
 
 class TestAdjustableSemaphore(unittest.TestCase):
-    def setUp(self):
+    def __init__(self, *args: str, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.loop: asyncio.AbstractEventLoop
+
+    def setUp(self) -> None:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
@@ -77,15 +81,15 @@ class TestAdjustableSemaphore(unittest.TestCase):
 
         sem_acquire_count = 0
 
-        async def internal_task(sem):
+        async def internal_task(sem: AdjustableSemaphore) -> bool:
             nonlocal sem_acquire_count
             async with sem:
                 sem_acquire_count += 1
                 await asyncio.sleep(0.01)
                 return True
 
-        async def run_tasks(sem):
-            return await asyncio.gather(internal_task(sem), internal_task(sem))
+        async def run_tasks(sem: AdjustableSemaphore) -> tuple[bool, bool]:
+            return await asyncio.gather(internal_task(sem), internal_task(sem))  # type: ignore[return-value]
 
         # 创建一个没有忽略循环绑定异常的信号量
         sem_no_ignore = AdjustableSemaphore(initial_value=1)
@@ -160,15 +164,17 @@ class TestAdjustableSemaphore(unittest.TestCase):
         self.loop.run_until_complete(first_test())
 
         # 第二个测试：测试跨不同循环的行为 - 不忽略异常
-        async def task_without_ignore(sem):
+        async def task_without_ignore(sem: AdjustableSemaphore) -> bool:
             async with sem:
                 await asyncio.sleep(0.01)
                 return True
 
-        async def run_tasks_without_ignore(sem):
+        async def run_tasks_without_ignore(
+            sem: AdjustableSemaphore,
+        ) -> tuple[bool, bool]:
             return await asyncio.gather(
                 task_without_ignore(sem), task_without_ignore(sem)
-            )
+            )  # type: ignore[return-value]
 
         # 创建一个没有忽略循环绑定异常的信号量
         sem_no_ignore = AdjustableSemaphore(initial_value=1)
@@ -186,13 +192,13 @@ class TestAdjustableSemaphore(unittest.TestCase):
             asyncio.run(run_tasks_without_ignore(sem_no_ignore))
 
         # 第三个测试：测试跨不同循环的行为 - 忽略异常
-        async def task_with_ignore(sem):
+        async def task_with_ignore(sem: AdjustableSemaphore) -> bool:
             async with sem:
                 await asyncio.sleep(0.01)
                 return True
 
-        async def run_tasks_with_ignore(sem):
-            return await asyncio.gather(task_with_ignore(sem), task_with_ignore(sem))
+        async def run_tasks_with_ignore(sem: AdjustableSemaphore) -> tuple[bool, bool]:
+            return await asyncio.gather(task_with_ignore(sem), task_with_ignore(sem))  # type: ignore[return-value]
 
         # 创建一个忽略循环绑定异常的信号量
         sem_ignore = AdjustableSemaphore(

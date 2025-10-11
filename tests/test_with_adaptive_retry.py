@@ -5,6 +5,10 @@ from adaptio import ServiceOverloadError, with_adaptive_retry
 
 
 class TestWithAdaptiveRetry(unittest.TestCase):
+    def __init__(self, *args: str, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.loop: asyncio.AbstractEventLoop
+
     def setUp(self) -> None:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)

@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Coroutine
+from typing import Any
 
 from .adjustable_semaphore import AdjustableSemaphore
 from .log_utils import setup_colored_logger
@@ -69,7 +70,7 @@ class AdaptiveAsyncConcurrencyLimiter:
             log_level=log_level,
         )
 
-        self.submitted_tasks: set[asyncio.Future] = set()
+        self.submitted_tasks: set[asyncio.Future[Any]] = set()
 
         self.current_failed_count = 0
         self.current_overload_count = 0
@@ -127,7 +128,7 @@ class AdaptiveAsyncConcurrencyLimiter:
 
         await self.workers_lock.set_value(new_concurrency)
 
-    def submit(self, coro: Coroutine):
+    def submit(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task[Any]:
         if not self.workers_lock.initial_value:
             raise RuntimeError("并发限制器已关闭")
 
@@ -175,7 +176,7 @@ class AdaptiveAsyncConcurrencyLimiter:
                         await self.adjust_concurrency()
                         self.reset_counters()
 
-        def _on_done(task):
+        def _on_done(task: asyncio.Task[Any]) -> None:
             # self.finished_tasks.put_nowait(task)
             self.submitted_tasks.remove(task)
 

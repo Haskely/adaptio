@@ -1,15 +1,18 @@
 import asyncio
+import inspect
 import logging
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from adaptio.adaptive_async_concurrency_limiter import (
     AdaptiveAsyncConcurrencyLimiter,
     ServiceOverloadError,
 )
 
+P = ParamSpec("P")
 R = TypeVar("R")
+T = TypeVar("T")
 
 
 def with_adaptive_retry(
@@ -24,10 +27,12 @@ def with_adaptive_retry(
     log_level: str = "INFO",
     log_prefix: str = "",
     ignore_loop_bound_exception: bool = False,
-) -> Callable[
-    [Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]
-]:
-    """装饰器：为异步函数添加自适应重试机制。
+):
+    """装饰器：为异步函数或异步生成器添加自适应重试机制。
+
+    自动检测被装饰的函数类型：
+    - 普通异步函数 (async def func() -> T): 对函数调用进行并发控制
+    - 异步生成器 (async def func() -> AsyncGenerator[T, None]): 对生成器迭代进行并发控制
 
     当函数触发过载异常时，会自动重试并通过 AdaptiveConcurrencyLimiter 动态调整并发数。
 
@@ -51,7 +56,26 @@ def with_adaptive_retry(
             https://github.com/python/cpython/blob/v3.13.3/Lib/asyncio/mixins.py#L20
 
     Returns:
-        装饰后的异步函数，具有自适应重试能力
+        装饰后的函数，具有自适应重试能力
+
+    Example:
+        ```python
+        # 装饰普通异步函数
+        @with_adaptive_retry()
+        async def fetch_data(url: str) -> dict:
+            async with session.get(url) as resp:
+                if resp.status == 429:
+                    raise ServiceOverloadError("Rate limited")
+                return await resp.json()
+
+        # 装饰异步生成器（自动检测）
+        @with_adaptive_retry()
+        async def fetch_pages(base_url: str):
+            for page in range(1, 100):
+                data = await fetch_page(f"{base_url}?page={page}")
+                for item in data:
+                    yield item
+        ```
     """
     # 如果没有传入 scheduler，则创建一个新的限制器实例
     _scheduler = scheduler or AdaptiveAsyncConcurrencyLimiter(
@@ -65,32 +89,115 @@ def with_adaptive_retry(
         ignore_loop_bound_exception=ignore_loop_bound_exception,
     )
 
-    def decorator(
-        func: Callable[..., Coroutine[Any, Any, R]],
-    ) -> Callable[..., Coroutine[Any, Any, R]]:
+    def decorator(func: Callable[P, Any]) -> Callable[P, Any]:
         if not _scheduler.log_prefix:
             _scheduler.log_prefix = getattr(func, "__name__", "unnamed_function")
 
-        @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> R:
-            retries = 0
-            # 为装饰器创建独立的 logger
-            retry_logger = logging.getLogger(f"retry_{id(func)}")
-            while True:
-                try:
-                    task = _scheduler.submit(func(*args, **kwargs))
-                    return await task  # type: ignore
-                except _scheduler.overload_exception:
-                    retries += 1
-                    if retries > max_retries:
-                        retry_logger.error(
-                            f"{_scheduler.log_prefix} -- 重试次数已达上限({retries}次)，服务仍处于过载状态"
-                        )
-                        raise
-                    await asyncio.sleep(retry_interval_seconds)
-                    continue
+        retry_logger = logging.getLogger(f"retry_{id(func)}")
 
-        return wrapper
+        # 🔍 关键：检测函数类型
+        is_async_gen = inspect.isasyncgenfunction(func)
+
+        if is_async_gen:
+            # ========== 异步生成器处理逻辑 ==========
+            @wraps(func)
+            async def generator_wrapper(*args, **kwargs):
+                retries = 0
+
+                while True:
+                    try:
+                        async with _scheduler.workers_lock:
+                            _scheduler.current_running_count += 1
+
+                            try:
+                                # 创建并迭代生成器
+                                generator = func(*args, **kwargs)
+                                item_count = 0
+
+                                async for item in generator:
+                                    yield item
+                                    item_count += 1
+
+                                # 成功完成
+                                _scheduler.current_succeed_count += 1
+                                retry_logger.debug(
+                                    f"{_scheduler.log_prefix} -- "
+                                    f"生成器成功完成，产出 {item_count} 个项目"
+                                )
+                                return  # 成功退出
+
+                            except _scheduler.overload_exception as e:
+                                _scheduler.current_overload_count += 1
+                                retries += 1
+
+                                if retries > max_retries:
+                                    retry_logger.error(
+                                        f"{_scheduler.log_prefix} -- "
+                                        f"重试次数已达上限({retries}次)，生成器仍处于过载状态"
+                                    )
+                                    raise
+
+                                retry_logger.warning(
+                                    f"{_scheduler.log_prefix} -- "
+                                    f"生成器触发过载 (尝试 {retries}/{max_retries}): {e}"
+                                )
+
+                                # 等待后重试整个生成器
+                                await asyncio.sleep(retry_interval_seconds)
+                                continue  # 重新开始
+
+                            except Exception:
+                                _scheduler.current_failed_count += 1
+                                raise
+
+                            finally:
+                                _scheduler.current_finished_count += 1
+                                _scheduler.current_running_count -= 1
+
+                                # 调整并发度
+                                if _scheduler.workers_lock.get_value() < 0:
+                                    _scheduler.reset_counters()
+
+                                if (
+                                    _scheduler.current_finished_count
+                                    > _scheduler.workers_lock.initial_value
+                                ):
+                                    await _scheduler.adjust_concurrency()
+                                    _scheduler.reset_counters()
+
+                        # 如果没有异常，break 退出重试循环
+                        break
+
+                    except _scheduler.overload_exception:
+                        if retries > max_retries:
+                            raise
+                        continue
+
+            return generator_wrapper
+
+        else:
+            # ========== 普通异步函数处理逻辑（保持原有实现）==========
+            @wraps(func)
+            async def function_wrapper(*args: Any, **kwargs: Any) -> Any:
+                retries = 0
+
+                while True:
+                    try:
+                        coro = func(*args, **kwargs)
+                        task = _scheduler.submit(coro)  # type: ignore[arg-type]
+                        return await task  # type: ignore
+                    except _scheduler.overload_exception:
+                        retries += 1
+                        if retries > max_retries:
+                            retry_logger.error(
+                                f"{_scheduler.log_prefix} -- "
+                                f"重试次数已达上限({retries}次)，服务仍处于过载状态"
+                            )
+                            raise
+                        await asyncio.sleep(retry_interval_seconds)
+                        continue
+
+            return function_wrapper
 
     return decorator
 
@@ -123,8 +230,8 @@ if __name__ == "__main__":
         return f"Task {task_id} done"
 
     @with_adaptive_retry(initial_concurrency=4, log_level="INFO")
-    async def sample_task_with_retry(task_id):
-        return await sample_task(task_id)
+    async def sample_task_with_retry(task_id: int) -> str:
+        return await sample_task(task_id)  # type: ignore[arg-type]
 
     async def get_result():
         tasks = [sample_task_with_retry(i) for i in range(1000)]

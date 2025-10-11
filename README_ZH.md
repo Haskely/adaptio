@@ -175,6 +175,121 @@ if __name__ == "__main__":
 - 如果函数之间完全独立，可以使用默认配置或独立的自定义配置
 - 共享调度器可以更精确地控制整体系统负载，避免资源过度使用
 
+## 异步生成器支持
+
+`with_adaptive_retry` 装饰器现已支持异步生成器！装饰器会自动检测函数类型并提供相应的并发控制和重试机制。
+
+### 基本用法
+
+```python
+from adaptio import with_adaptive_retry, ServiceOverloadError
+import aiohttp
+
+# ✅ 同一个装饰器，自动适配普通异步函数
+@with_adaptive_retry(initial_concurrency=10)
+async def fetch_one_page(url: str) -> dict:
+    """获取单个页面"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 429:
+                raise ServiceOverloadError("Rate limited")
+            return await response.json()
+
+# ✅ 同一个装饰器，自动适配异步生成器
+@with_adaptive_retry(initial_concurrency=5)
+async def fetch_all_pages(base_url: str):
+    """流式获取所有分页数据"""
+    async with aiohttp.ClientSession() as session:
+        page = 1
+        while True:
+            url = f"{base_url}?page={page}"
+            async with session.get(url) as response:
+                if response.status == 429:
+                    raise ServiceOverloadError("Rate limited")
+
+                data = await response.json()
+                if not data:
+                    break
+
+                for item in data:
+                    yield item
+
+                page += 1
+
+# 使用方式完全一致
+async def main():
+    # 使用普通函数
+    result = await fetch_one_page("https://api.example.com/data")
+    print(result)
+
+    # 使用生成器
+    async for item in fetch_all_pages("https://api.example.com/items"):
+        print(item)
+```
+
+### 重要提示
+
+⚠️ **数据重复风险**：当生成器在部分执行后失败并重试时，会重新执行整个生成器，可能导致已产出的数据被重复产出。请确保：
+
+1. 生成器的执行是幂等的，或
+2. 消费者能够处理重复数据，或
+3. 使用去重机制
+
+### 适用场景
+
+✅ **推荐使用**：
+- 分页 API 爬取
+- 数据库批量查询（每批独立）
+- 文件批量处理
+- 流式数据转换
+
+❌ **不推荐使用**：
+- 长时间运行的实时流（如 WebSocket）
+- 有状态的数据流处理
+- 需要事务保证的场景
+
+
+### `with_async_control` 的异步生成器支持
+
+`with_async_control` 装饰器同样支持异步生成器！它会自动检测函数类型并提供相应的并发控制、QPS 限制和重试功能。
+
+```python
+from adaptio import with_async_control
+
+# ✅ 装饰异步生成器
+@with_async_control(
+    max_concurrency=3,
+    max_qps=5,
+    retry_n=2,
+    cared_exception=ValueError
+)
+async def fetch_paginated_data(base_url: str):
+    """流式获取分页数据，带并发和QPS控制"""
+    page = 1
+    while True:
+        # 模拟 API 调用
+        data = await fetch_page(f"{base_url}?page={page}")
+        if not data:
+            break
+
+        for item in data:
+            yield item
+
+        page += 1
+
+# 使用
+async def main():
+    async for item in fetch_paginated_data("https://api.example.com/items"):
+        print(item)
+```
+
+查看 `tests/test_with_async_control_generator.py` 获取更多使用示例。
+
+### 更多示例
+
+查看 `examples/async_generator_examples.py` 获取更多使用示例。
+
+
 ## 装饰 aiohttp 请求函数
 
 raise_on_aiohttp_overload 装饰器用于将 aiohttp 的特定HTTP状态码转换为 ServiceOverloadError 异常,便于与动态任务调度器集成。
