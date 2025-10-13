@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.5.0 (2025-10-13)
+
+### Feat
+
+- add staticmethod/classmethod compatibility for all decorators
+
 ## v0.4.0 (2025-10-11)
 
 ### Feat
