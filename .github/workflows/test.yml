@@ -3,10 +3,18 @@ name: Test Package Installation and Basic Functions
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
   pull_request:
     branches: [ "main" ]
   # 当发布工作流触发时也运行测试
   workflow_call:
+
+# 添加明确的权限限制
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -16,36 +24,19 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
-        python-version: ${{ matrix.python-version }}
+        persist-credentials: false  # 防止凭证持久化
 
-    - name: Install package and dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+    # https://docs.astral.sh/uv/guides/integration/github/#syncing-and-running
+    - name: Install uv
+      uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v5
+      with:
+        enable-cache: true
+
+    - name: Install the project
+      run: uv sync --all-extras --dev
 
     - name: Run tests
-      run: |
-        python -m unittest discover tests
+      run: uv run pytest tests
 
-    - name: Test basic functionality
-      run: |
-        python -c '
-        import asyncio
-        from adaptio import with_adaptive_retry, ServiceOverloadError
-
-        @with_adaptive_retry()
-        async def test_func():
-            return "success"
-
-        async def main():
-            result = await test_func()
-            assert result == "success"
-            print("Basic functionality test passed!")
-
-        asyncio.run(main())
-        '
