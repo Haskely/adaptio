@@ -1,5 +1,5 @@
 import functools
-from collections.abc import Callable, Iterable
+from collections.abc import AsyncGenerator, Callable, Iterable
 from typing import Any, ParamSpec, TypeVar, cast
 
 from .adaptive_async_concurrency_limiter import ServiceOverloadError
@@ -20,9 +20,13 @@ OVERLOAD_KEYWORDS = (
     "rate limit",
     "rate limited",
     "try again",
+    "trying again",
     "retry",
     "busy",
     "too many",
+    "throttling",
+    "throttled",
+    "wait",
 )
 
 
@@ -108,15 +112,17 @@ def raise_on_overload(
         if is_async_gen:
             # ========== 异步生成器处理逻辑 ==========
             @functools.wraps(actual_func)  # type: ignore[arg-type]
-            async def generator_wrapper(*args: Any, **kwargs: Any):
-                generator = actual_func(*args, **kwargs)  # type: ignore[misc,operator]
+            async def generator_wrapper(
+                *args: Any, **kwargs: Any
+            ) -> AsyncGenerator[Any, None]:
+                generator: AsyncGenerator[Any, None] = actual_func(*args, **kwargs)  # type: ignore[misc,operator]
                 try:
                     async for item in generator:
                         try:
                             yield item
                         except Exception as e:
                             if is_cared_exception(e):
-                                exception_str = str(e)
+                                exception_str = str(e).lower()
                                 if any(
                                     keyword in exception_str
                                     for keyword in overload_keywords
@@ -133,10 +139,10 @@ def raise_on_overload(
                     raise e
 
             # 如果原来是 staticmethod/classmethod，需要重新包装
-            return cast(
-                Callable[P, T],
-                rewrap_static_class_method(generator_wrapper, is_static, is_class),
-            )  # type: ignore[arg-type]
+            wrapped_func = rewrap_static_class_method(
+                generator_wrapper, is_static, is_class
+            )
+            return cast(Callable[P, T], wrapped_func)
 
         else:
             # ========== 普通异步函数处理逻辑 ==========
@@ -154,9 +160,9 @@ def raise_on_overload(
                     raise e
 
             # 如果原来是 staticmethod/classmethod，需要重新包装
-            return cast(
-                Callable[P, T],
-                rewrap_static_class_method(function_wrapper, is_static, is_class),
-            )  # type: ignore[arg-type]
+            wrapped_func = rewrap_static_class_method(
+                function_wrapper, is_static, is_class
+            )
+            return cast(Callable[P, T], wrapped_func)
 
     return decorator

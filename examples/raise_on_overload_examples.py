@@ -200,7 +200,7 @@ async def main():
         print(f"❌ 类方法过载: {e}")
 
     try:
-        items = []
+        items: list[int] = []
         async for item in APIClient.static_stream(5):
             items.append(item)
         print(f"✅ 静态生成器成功: 收到 {len(items)} 项数据")

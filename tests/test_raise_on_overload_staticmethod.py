@@ -1,5 +1,8 @@
 """测试 raise_on_overload 装饰器对 staticmethod 和 classmethod 的兼容性。"""
 
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import pytest
 
 from adaptio import ServiceOverloadError, raise_on_overload
@@ -157,25 +160,27 @@ class TestRaiseOnOverloadClassMethod:
 
             @classmethod
             @raise_on_overload()
-            async def stream_data(cls, count: int, fail_at: int = -1):
+            async def stream_data(
+                cls, count: int, fail_at: int = -1
+            ) -> AsyncGenerator[dict[str, Any], None]:
                 for i in range(count):
                     if i == fail_at:
                         raise RuntimeError("too many requests")
                     yield {"index": i, "api": cls.name}
 
         # 测试成功情况
-        items = []
+        items: list[dict[str, Any]] = []
         async for item in API.stream_data(3):
             items.append(item)
         assert len(items) == 3
         assert all(item["api"] == "TestAPI" for item in items)
 
         # 测试过载情况
-        items = []
+        items_fail: list[dict[str, Any]] = []
         with pytest.raises(ServiceOverloadError):
             async for item in API.stream_data(5, fail_at=2):
-                items.append(item)
-        assert len(items) == 2
+                items_fail.append(item)
+        assert len(items_fail) == 2
 
     @pytest.mark.asyncio
     async def test_classmethod_generator_order_2(self):
@@ -186,22 +191,24 @@ class TestRaiseOnOverloadClassMethod:
 
             @raise_on_overload()
             @classmethod
-            async def stream_data(cls, count: int, fail_at: int = -1):
+            async def stream_data(
+                cls, count: int, fail_at: int = -1
+            ) -> AsyncGenerator[dict[str, Any], None]:
                 for i in range(count):
                     if i == fail_at:
                         raise RuntimeError("too many requests")
                     yield {"index": i, "api": cls.name}
 
         # 测试成功情况
-        items = []
+        items_success: list[dict[str, Any]] = []
         async for item in API.stream_data(3):
-            items.append(item)
-        assert len(items) == 3
-        assert all(item["api"] == "TestAPI" for item in items)
+            items_success.append(item)
+        assert len(items_success) == 3
+        assert all(item["api"] == "TestAPI" for item in items_success)
 
         # 测试过载情况
-        items = []
+        items_overload: list[dict[str, Any]] = []
         with pytest.raises(ServiceOverloadError):
             async for item in API.stream_data(5, fail_at=2):
-                items.append(item)
-        assert len(items) == 2
+                items_overload.append(item)
+        assert len(items_overload) == 2

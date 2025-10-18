@@ -1,5 +1,5 @@
 import functools
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from typing import Any, ParamSpec, TypeVar, cast
 
 import aiohttp
@@ -67,8 +67,10 @@ def raise_on_aiohttp_overload(
         if is_async_gen:
             # ========== 异步生成器处理逻辑 ==========
             @functools.wraps(actual_func)  # type: ignore[arg-type]
-            async def generator_wrapper(*args: Any, **kwargs: Any):
-                generator = actual_func(*args, **kwargs)  # type: ignore[misc,operator]
+            async def generator_wrapper(
+                *args: Any, **kwargs: Any
+            ) -> AsyncGenerator[Any, None]:
+                generator: AsyncGenerator[Any, None] = actual_func(*args, **kwargs)  # type: ignore[misc,operator]
                 try:
                     async for item in generator:
                         try:
@@ -83,10 +85,10 @@ def raise_on_aiohttp_overload(
                     raise e
 
             # 如果原来是 staticmethod/classmethod，需要重新包装
-            return cast(
-                Callable[P, T],
-                rewrap_static_class_method(generator_wrapper, is_static, is_class),
-            )  # type: ignore[arg-type]
+            wrapped_func = rewrap_static_class_method(
+                generator_wrapper, is_static, is_class
+            )
+            return cast(Callable[P, T], wrapped_func)
 
         else:
             # ========== 普通异步函数处理逻辑 ==========
@@ -100,9 +102,9 @@ def raise_on_aiohttp_overload(
                     raise e
 
             # 如果原来是 staticmethod/classmethod，需要重新包装
-            return cast(
-                Callable[P, T],
-                rewrap_static_class_method(function_wrapper, is_static, is_class),
-            )  # type: ignore[arg-type]
+            wrapped_func = rewrap_static_class_method(
+                function_wrapper, is_static, is_class
+            )
+            return cast(Callable[P, T], wrapped_func)
 
     return decorator
