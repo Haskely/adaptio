@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.5.1 (2025-10-18)
+
+### Fix
+
+- improve type safety and error detection
+
 ## v0.5.0 (2025-10-13)
 
 ### Feat
