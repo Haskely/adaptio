@@ -26,7 +26,7 @@ def with_adaptive_retry(
     overload_exception: type[BaseException] = ServiceOverloadError,
     log_level: str = "INFO",
     log_prefix: str = "",
-    ignore_loop_bound_exception: bool = False,
+    ignore_loop_bound_exception: bool = True,
 ):
     """装饰器：为异步函数或异步生成器添加自适应重试机制。
 
@@ -48,11 +48,12 @@ def with_adaptive_retry(
         overload_exception: 当 scheduler 为 None 时检测的过载异常类型
         log_level: 当 scheduler 为 None 时使用的日志级别
         log_prefix: 当 scheduler 为 None 时使用的日志前缀
-        ignore_loop_bound_exception: 是否忽略循环边界异常
-            如果你获取了一个在另一个asyncio循环中初始化的信号量，实际上它没有任何限制并发的能力！
-            默认情况下，这个库在这种情况下会引发RuntimeError异常。
-            但是，如果你将此选项设置为True，它将忽略异常，并且除了打印一条 warning 外没有其他动作。
-            通常情况下很难在实际应用中出发这个错误，除非刻意写出在同步函数中使用多线程调用异步函数的代码。
+        ignore_loop_bound_exception: 是否忽略事件循环绑定异常
+            如果在另一个 asyncio 循环中使用信号量，标准信号量会引发 RuntimeError。
+            设置为 True（默认）时，会为每个 event loop 创建独立的信号量实例（LoopLocalAdjustableSemaphore），
+            这样每个 loop 都有自己独立的并发限制，避免跨 loop 使用异常。
+            设置为 False 时，使用标准信号量，跨 loop 使用时会抛出 RuntimeError。
+            通常情况下很难在实际应用中触发这个错误，除非刻意写出在同步函数中使用多线程调用异步函数的代码。
             https://github.com/python/cpython/blob/v3.13.3/Lib/asyncio/mixins.py#L20
 
     Returns:
@@ -229,12 +230,14 @@ if __name__ == "__main__":
             sample_task_running_count -= 1
         return f"Task {task_id} done"
 
-    @with_adaptive_retry(initial_concurrency=4, log_level="INFO")
+    @with_adaptive_retry(
+        initial_concurrency=4, log_level="DEBUG", ignore_loop_bound_exception=False
+    )
     async def sample_task_with_retry(task_id: int) -> str:
         return await sample_task(task_id)  # type: ignore[arg-type]
 
     async def get_result():
-        tasks = [sample_task_with_retry(i) for i in range(1000)]
+        tasks = [sample_task_with_retry(i) for i in range(200)]
         for res in asyncio.as_completed(tasks):
             try:
                 logging.info(f"SUCCESS: {await res}")

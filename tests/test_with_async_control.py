@@ -1,5 +1,6 @@
 import asyncio
 import unittest
+import warnings
 
 from adaptio import with_async_control
 
@@ -77,6 +78,35 @@ class TestWithAsyncControl(unittest.TestCase):
             self.assertEqual(retry_count, 3)
 
         self.loop.run_until_complete(test_control_callable())
+
+    def test_asyncio_run_multiple_times_with_qps_and_loop_local(self):
+        """测试 LoopLocalLock 在多次 asyncio.run() 调用间能正常工作"""
+
+        @with_async_control(max_qps=10, ignore_loop_bound_exception=True)
+        async def qps_controlled_task(task_id: int) -> str:
+            return f"task-{task_id}"
+
+        async def run_multiple_tasks(run_id: int):
+            # 每次运行3个任务
+            tasks = [qps_controlled_task(i) for i in range(3)]
+            results = await asyncio.gather(*tasks)  # type: ignore[arg-type]
+            return (run_id, results)
+
+        # 多次 asyncio.run() 都应该成功（因为使用 LoopLocalLock）
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            run1_id, run1_results = asyncio.run(run_multiple_tasks(1))
+            self.assertEqual(run1_id, 1)
+            self.assertEqual(len(run1_results), 3)
+
+            run2_id, run2_results = asyncio.run(run_multiple_tasks(2))
+            self.assertEqual(run2_id, 2)
+            self.assertEqual(len(run2_results), 3)
+
+            run3_id, run3_results = asyncio.run(run_multiple_tasks(3))
+            self.assertEqual(run3_id, 3)
+            self.assertEqual(len(run3_results), 3)
 
 
 if __name__ == "__main__":

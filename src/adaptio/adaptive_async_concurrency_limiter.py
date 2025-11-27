@@ -28,10 +28,11 @@ class AdaptiveAsyncConcurrencyLimiter:
         log_level: 日志级别
         log_prefix: 日志前缀
         ignore_loop_bound_exception: 是否忽略事件循环绑定异常
-            如果你获取了一个在另一个asyncio循环中初始化的信号量，实际上它没有任何限制并发的能力！
-            默认情况下，这个库在这种情况下会引发RuntimeError异常。
-            但是，如果你将此选项设置为True，它将忽略异常，并且除了打印一条 warning 外没有其他动作。
-            通常情况下很难在实际应用中出发这个错误，除非刻意写出在同步函数中使用多线程调用异步函数的代码。
+            如果在另一个 asyncio 循环中使用信号量，标准信号量会引发 RuntimeError。
+            设置为 True（默认）时，会为每个 event loop 创建独立的信号量实例（LoopLocalAdjustableSemaphore），
+            这样每个 loop 都有自己独立的并发限制，避免跨 loop 使用异常。
+            设置为 False 时，使用标准信号量，跨 loop 使用时会抛出 RuntimeError。
+            通常情况下很难在实际应用中触发这个错误，除非刻意写出在同步函数中使用多线程调用异步函数的代码。
             https://github.com/python/cpython/blob/v3.13.3/Lib/asyncio/mixins.py#L20
     """
 
@@ -44,7 +45,7 @@ class AdaptiveAsyncConcurrencyLimiter:
         overload_exception: type[BaseException] = ServiceOverloadError,
         log_level: str = "INFO",
         log_prefix: str = "",
-        ignore_loop_bound_exception: bool = False,
+        ignore_loop_bound_exception: bool = True,
     ):
         if initial_concurrency < min_concurrency:
             raise ValueError(

@@ -1,8 +1,13 @@
 import asyncio
+import threading
 import unittest
 import warnings
 
-from adaptio import AdjustableSemaphore
+from adaptio import (
+    AdjustableSemaphore,
+    AdjustableSemaphoreType,
+    LoopLocalAdjustableSemaphore,
+)
 
 
 class TestAdjustableSemaphore(unittest.TestCase):
@@ -81,14 +86,14 @@ class TestAdjustableSemaphore(unittest.TestCase):
 
         sem_acquire_count = 0
 
-        async def internal_task(sem: AdjustableSemaphore) -> bool:
+        async def internal_task(sem: AdjustableSemaphoreType) -> bool:
             nonlocal sem_acquire_count
             async with sem:
                 sem_acquire_count += 1
                 await asyncio.sleep(0.01)
                 return True
 
-        async def run_tasks(sem: AdjustableSemaphore) -> tuple[bool, bool]:
+        async def run_tasks(sem: AdjustableSemaphoreType) -> tuple[bool, bool]:
             return await asyncio.gather(internal_task(sem), internal_task(sem))  # type: ignore[return-value]
 
         # 创建一个没有忽略循环绑定异常的信号量
@@ -164,13 +169,13 @@ class TestAdjustableSemaphore(unittest.TestCase):
         self.loop.run_until_complete(first_test())
 
         # 第二个测试：测试跨不同循环的行为 - 不忽略异常
-        async def task_without_ignore(sem: AdjustableSemaphore) -> bool:
+        async def task_without_ignore(sem: AdjustableSemaphoreType) -> bool:
             async with sem:
                 await asyncio.sleep(0.01)
                 return True
 
         async def run_tasks_without_ignore(
-            sem: AdjustableSemaphore,
+            sem: AdjustableSemaphoreType,
         ) -> tuple[bool, bool]:
             return await asyncio.gather(
                 task_without_ignore(sem), task_without_ignore(sem)
@@ -192,12 +197,14 @@ class TestAdjustableSemaphore(unittest.TestCase):
             asyncio.run(run_tasks_without_ignore(sem_no_ignore))
 
         # 第三个测试：测试跨不同循环的行为 - 忽略异常
-        async def task_with_ignore(sem: AdjustableSemaphore) -> bool:
+        async def task_with_ignore(sem: AdjustableSemaphoreType) -> bool:
             async with sem:
                 await asyncio.sleep(0.01)
                 return True
 
-        async def run_tasks_with_ignore(sem: AdjustableSemaphore) -> tuple[bool, bool]:
+        async def run_tasks_with_ignore(
+            sem: AdjustableSemaphoreType,
+        ) -> tuple[bool, bool]:
             return await asyncio.gather(task_with_ignore(sem), task_with_ignore(sem))  # type: ignore[return-value]
 
         # 创建一个忽略循环绑定异常的信号量
@@ -218,6 +225,184 @@ class TestAdjustableSemaphore(unittest.TestCase):
             results = asyncio.run(run_tasks_with_ignore(sem_ignore))
             self.assertEqual(len(results), 2)
             self.assertTrue(all(results))
+
+    def test_multi_threading_with_loop_local(self):
+        """测试 LoopLocalAdjustableSemaphore 在多线程多loop场景下的行为
+
+        使用 LoopLocalAdjustableSemaphore 可以完美解决多线程场景下的问题：
+        - 每个 event loop 拥有独立的 AdjustableSemaphore 实例
+        - 不同 loop 之间互不干扰，各自独立计数和通知
+        - 所有线程都能正常获取和释放信号量
+        """
+        # 使用新的 LoopLocalAdjustableSemaphore
+        sem = LoopLocalAdjustableSemaphore(initial_value=2)
+
+        results: list[str] = []
+        errors: list[tuple[str, Exception]] = []
+
+        def run_in_thread(thread_name: str):
+            """在新线程中运行异步任务"""
+
+            async def worker():
+                try:
+                    async with sem:
+                        results.append(f"{thread_name} acquired")
+                        await asyncio.sleep(0.1)
+                        results.append(f"{thread_name} released")
+                        return True
+                except Exception as e:
+                    errors.append((thread_name, e))
+                    return False
+
+            # 在新的 event loop 中运行
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    result = loop.run_until_complete(worker())
+                    return result
+            finally:
+                loop.close()
+
+        # 创建多个线程，每个线程有自己的 event loop
+        threads = []
+        for i in range(4):
+            t = threading.Thread(target=run_in_thread, args=(f"Thread-{i}",))
+            threads.append(t)
+            t.start()
+
+        # 等待所有线程完成
+        for t in threads:
+            t.join(timeout=5.0)
+            self.assertFalse(
+                t.is_alive(), f"Thread {t.name} is still alive (deadlocked)"
+            )
+
+        # 验证没有错误发生
+        self.assertEqual(len(errors), 0, f"Errors occurred: {errors}")
+
+        # 验证所有线程都成功获取和释放了信号量
+        self.assertEqual(
+            len(results), 8
+        )  # 4 threads * 2 operations (acquire + release)
+
+        # 验证每个线程都有 acquired 和 released
+        for i in range(4):
+            self.assertIn(f"Thread-{i} acquired", results)
+            self.assertIn(f"Thread-{i} released", results)
+
+    def test_loop_local_semaphore_basic_functionality(self):
+        """测试 LoopLocalAdjustableSemaphore 的基本功能"""
+
+        async def test_basic():
+            sem = LoopLocalAdjustableSemaphore(initial_value=2)
+
+            async def task():
+                async with sem:
+                    await asyncio.sleep(0.1)
+                    return True
+
+            # 测试基本的并发控制
+            results = await asyncio.gather(*[task() for _ in range(3)])
+            self.assertTrue(all(results))
+
+            # 测试 get_value
+            self.assertEqual(sem.get_value(), 2)
+
+            # 测试 get_initial_value
+            self.assertEqual(sem.get_initial_value_config(), 2)
+
+        self.loop.run_until_complete(test_basic())
+
+    def test_loop_local_semaphore_set_value(self):
+        """测试 LoopLocalAdjustableSemaphore 的 set_value 功能"""
+
+        async def test_set_value():
+            sem = LoopLocalAdjustableSemaphore(initial_value=2)
+
+            # 测试增加值
+            await sem.set_value(4)
+            self.assertEqual(sem.get_value(), 4)
+
+            # 测试减少值
+            await sem.set_value(1)
+            self.assertEqual(sem.get_value(), 1)
+
+            async def task():
+                async with sem:
+                    await asyncio.sleep(0.1)
+                    return True
+
+            # 创建任务，只有一个能立即执行
+            tasks = [asyncio.create_task(task()) for _ in range(2)]
+            done, pending = await asyncio.wait(tasks, timeout=0.15)
+            self.assertEqual(len(done), 1)
+            self.assertEqual(len(pending), 1)
+
+            # 清理
+            for t in pending:
+                t.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+
+        self.loop.run_until_complete(test_set_value())
+
+    def test_loop_local_semaphore_multiple_asyncio_run(self):
+        """测试 LoopLocalAdjustableSemaphore 在多次 asyncio.run() 调用间的行为"""
+
+        async def use_sem(sem: AdjustableSemaphoreType, worker_id: int):
+            # 每次调用都使用独立的 loop，因此有独立的信号量实例
+            async with sem:
+                await asyncio.sleep(0.01)
+                return worker_id
+
+        # 创建一个 LoopLocalAdjustableSemaphore
+        sem = LoopLocalAdjustableSemaphore(initial_value=1)
+
+        # 多次 asyncio.run() 都应该成功（每次使用不同 loop 的独立信号量）
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result1 = asyncio.run(use_sem(sem, 1))
+            self.assertEqual(result1, 1)
+
+            result2 = asyncio.run(use_sem(sem, 2))
+            self.assertEqual(result2, 2)
+
+            result3 = asyncio.run(use_sem(sem, 3))
+            self.assertEqual(result3, 3)
+
+    def test_asyncio_run_multiple_times_with_loop_local_should_succeed(self):
+        """测试 LoopLocalCondition 在多次 asyncio.run() 调用间能正常工作"""
+
+        async def create_and_use_sem():
+            # 在第一个 loop 中创建并使用 semaphore
+            sem = AdjustableSemaphore(initial_value=1, ignore_loop_bound_exception=True)
+            async with sem:
+                await asyncio.sleep(0.01)
+            return sem
+
+        # 第一次 asyncio.run() - 创建并使用 semaphore
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sem = asyncio.run(create_and_use_sem())
+
+        async def use_existing_sem(worker_id: int):
+            # 在后续的 loop 中使用 semaphore - 应该使用各自 loop 的 Condition
+            async with sem:
+                await asyncio.sleep(0.01)
+                return worker_id
+
+        # 多次 asyncio.run() 都应该成功（因为使用 LoopLocalCondition）
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result1 = asyncio.run(use_existing_sem(1))
+            self.assertEqual(result1, 1)
+
+            result2 = asyncio.run(use_existing_sem(2))
+            self.assertEqual(result2, 2)
+
+            result3 = asyncio.run(use_existing_sem(3))
+            self.assertEqual(result3, 3)
 
 
 if __name__ == "__main__":
