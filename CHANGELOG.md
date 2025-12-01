@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.6.0 (2025-12-01)
+
+### Feat
+
+- 添加 LoopLocalLock 和 LoopLocalAdjustableSemaphore 支持多线程场景
+
 ## v0.5.1 (2025-10-18)
 
 ### Fix
