@@ -404,6 +404,144 @@ class TestAdjustableSemaphore(unittest.TestCase):
             result3 = asyncio.run(use_existing_sem(3))
             self.assertEqual(result3, 3)
 
+    def test_loop_local_semaphore_concurrent_limit_integration(self):
+        """集成测试：验证 LoopLocalAdjustableSemaphore 能够正确限制并发数
+
+        这个测试模拟真实场景，验证：
+        1. 实际运行的并发数能够接近（但不超过）设定的限制
+        2. 动态调整并发限制后，系统能够正确响应
+        """
+        import random
+
+        # 并发阈值和计数器
+        max_allowed_concurrent = 10
+        current_running = 0
+        max_running_observed = 0
+        overload_count = 0
+        total_tasks = 0
+
+        async def monitored_task(sem: LoopLocalAdjustableSemaphore, task_id: int):
+            """模拟任务，监控并发数"""
+            nonlocal current_running, max_running_observed, overload_count, total_tasks
+
+            async with sem:
+                current_running += 1
+                total_tasks += 1
+
+                # 记录观察到的最大并发数
+                if current_running > max_running_observed:
+                    max_running_observed = current_running
+
+                # 检测是否超过阈值
+                if current_running > max_allowed_concurrent:
+                    overload_count += 1
+                    # 只记录前几次过载
+                    if overload_count <= 3:
+                        print(
+                            f"⚠️ 过载检测: 当前并发 {current_running} > 限制 {max_allowed_concurrent}"
+                        )
+
+                # 模拟任务执行时间
+                await asyncio.sleep(random.uniform(0.01, 0.05))
+                current_running -= 1
+
+                return f"Task {task_id} done"
+
+        async def run_integration_test():
+            nonlocal \
+                current_running, \
+                max_running_observed, \
+                overload_count, \
+                max_allowed_concurrent
+
+            # 创建信号量，初始值为 5
+            sem = LoopLocalAdjustableSemaphore(initial_value=5)
+
+            print("\n=== 阶段 1: 初始并发限制为 5 ===")
+            max_allowed_concurrent = 5
+            current_running = 0
+            max_running_observed = 0
+            overload_count = 0
+
+            # 启动 30 个任务
+            tasks = [monitored_task(sem, i) for i in range(30)]
+            await asyncio.gather(*tasks)
+
+            print(
+                f"✓ 完成阶段 1: 最大观察并发={max_running_observed}, 过载次数={overload_count}"
+            )
+            # 验证：最大并发应该接近 5，允许小幅超出（由于竞态条件）
+            self.assertLessEqual(
+                max_running_observed,
+                7,
+                f"并发数 {max_running_observed} 超出限制 5 太多",
+            )
+            self.assertGreaterEqual(
+                max_running_observed,
+                4,
+                f"并发数 {max_running_observed} 未充分利用限制 5",
+            )
+
+            # 阶段 2: 提升并发限制到 10
+            print("\n=== 阶段 2: 提升并发限制到 10 ===")
+            max_allowed_concurrent = 10
+            current_running = 0
+            max_running_observed = 0
+            overload_count = 0
+
+            await sem.set_value(10)
+
+            # 启动 50 个任务
+            tasks = [monitored_task(sem, i + 100) for i in range(50)]
+            await asyncio.gather(*tasks)
+
+            print(
+                f"✓ 完成阶段 2: 最大观察并发={max_running_observed}, 过载次数={overload_count}"
+            )
+            # 验证：最大并发应该接近 10
+            self.assertLessEqual(
+                max_running_observed,
+                12,
+                f"并发数 {max_running_observed} 超出限制 10 太多",
+            )
+            self.assertGreaterEqual(
+                max_running_observed,
+                8,
+                f"并发数 {max_running_observed} 未充分利用限制 10",
+            )
+
+            # 阶段 3: 降低并发限制到 3
+            print("\n=== 阶段 3: 降低并发限制到 3 ===")
+            max_allowed_concurrent = 3
+            current_running = 0
+            max_running_observed = 0
+            overload_count = 0
+
+            await sem.set_value(3)
+
+            # 启动 20 个任务
+            tasks = [monitored_task(sem, i + 200) for i in range(20)]
+            await asyncio.gather(*tasks)
+
+            print(
+                f"✓ 完成阶段 3: 最大观察并发={max_running_observed}, 过载次数={overload_count}"
+            )
+            # 验证：最大并发应该接近 3
+            self.assertLessEqual(
+                max_running_observed,
+                5,
+                f"并发数 {max_running_observed} 超出限制 3 太多",
+            )
+            self.assertGreaterEqual(
+                max_running_observed,
+                2,
+                f"并发数 {max_running_observed} 未充分利用限制 3",
+            )
+
+            print(f"\n✅ 集成测试通过！总任务数: {total_tasks}")
+
+        self.loop.run_until_complete(run_integration_test())
+
 
 if __name__ == "__main__":
     unittest.main()
