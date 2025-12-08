@@ -332,6 +332,180 @@ Differences from with_adaptive_retry:
 - with_adaptive_retry provides dynamic load adaptation capabilities
 - Choose the appropriate decorator based on actual requirements
 
+## Multi-threading/Multi-Event Loop Support: LoopLocalSemaphore and LoopLocalLock
+
+When using asyncio in a multi-threaded environment, you may encounter "RuntimeError: Semaphore/Lock is bound to a different event loop" errors. Adaptio provides `LoopLocalSemaphore` and `LoopLocalLock` to solve this problem.
+
+### Core Features
+
+- 🔄 **Loop-local Storage**: Automatically creates independent semaphore/lock instances for each event loop
+- 🧵 **Multi-threading Friendly**: Supports safe usage across different event loops in different threads
+- 🗑️ **Auto Cleanup**: Uses weak references to automatically clean up resources for unused loops
+- 🎯 **Consistent API**: Maintains the same usage pattern as standard `asyncio.Semaphore` and `asyncio.Lock`
+
+### LoopLocalSemaphore
+
+Provides an independent `asyncio.Semaphore` for each event loop for concurrency control.
+
+```python
+from adaptio import LoopLocalSemaphore
+import asyncio
+import threading
+
+# Create a semaphore that allows up to 3 concurrent tasks
+sem = LoopLocalSemaphore(3)
+
+async def worker(task_id: int):
+    """Task executed in the current loop"""
+    async with sem:  # Supports async with syntax
+        print(f"Task {task_id} is running")
+        await asyncio.sleep(1)
+        print(f"Task {task_id} completed")
+
+# Run in the main thread's loop
+async def main():
+    await asyncio.gather(*[worker(i) for i in range(10)])
+
+# Run in a new loop in a different thread - fully supported!
+def run_in_thread():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(main())
+    finally:
+        loop.close()
+
+# Start multiple threads, each with its own loop
+threads = [threading.Thread(target=run_in_thread) for _ in range(3)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+```
+
+### LoopLocalLock
+
+Provides an independent `asyncio.Lock` for each event loop for mutual exclusion control.
+
+```python
+from adaptio import LoopLocalLock
+import asyncio
+
+lock = LoopLocalLock()
+
+async def critical_section(task_id: int):
+    """Code section requiring mutual exclusion"""
+    async with lock:
+        print(f"Task {task_id} entered critical section")
+        await asyncio.sleep(0.1)
+        print(f"Task {task_id} left critical section")
+
+async def main():
+    await asyncio.gather(*[critical_section(i) for i in range(5)])
+
+asyncio.run(main())
+```
+
+### Integration with with_async_control
+
+The `with_async_control` decorator automatically uses `LoopLocalSemaphore` and `LoopLocalLock` when `ignore_loop_bound_exception=True`:
+
+```python
+from adaptio import with_async_control
+import asyncio
+
+@with_async_control(
+    max_concurrency=5,
+    max_qps=10,
+    ignore_loop_bound_exception=True  # Automatically uses LoopLocal implementations
+)
+async def api_call(task_id: int):
+    await asyncio.sleep(0.5)
+    return f"Task {task_id} completed"
+
+# Now safe to use in multi-threaded environments
+async def main():
+    results = await asyncio.gather(*[api_call(i) for i in range(20)])
+    print(results)
+
+asyncio.run(main())
+```
+
+### API Reference
+
+#### LoopLocalSemaphore
+
+```python
+class LoopLocalSemaphore:
+    def __init__(self, value: int = 1):
+        """
+        Initialize the semaphore
+
+        Args:
+            value: Initial value of the semaphore (maximum concurrency allowed), defaults to 1
+        """
+
+    async def acquire(self) -> bool:
+        """Acquire the semaphore"""
+
+    def release(self) -> None:
+        """Release the semaphore"""
+
+    def locked(self) -> bool:
+        """Returns whether the semaphore for the current loop is fully acquired"""
+
+    async def __aenter__(self):
+        """Supports async with syntax"""
+
+    async def __aexit__(self, exc_type, exc, tb):
+        """Supports async with syntax"""
+```
+
+#### LoopLocalLock
+
+```python
+class LoopLocalLock:
+    def __init__(self):
+        """Initialize the lock"""
+
+    async def acquire(self) -> bool:
+        """Acquire the lock"""
+
+    def release(self) -> None:
+        """Release the lock"""
+
+    def locked(self) -> bool:
+        """Returns whether the lock for the current loop is acquired"""
+
+    async def __aenter__(self):
+        """Supports async with syntax"""
+
+    async def __aexit__(self, exc_type, exc, tb):
+        """Supports async with syntax"""
+```
+
+### Important Notes
+
+⚠️ **Note**: `LoopLocalSemaphore` and `LoopLocalLock` provide "per-loop local concurrency control", not cross-loop/cross-thread global mutual exclusion.
+
+- ✅ **Suitable for**:
+  - Async code in multi-threaded environments
+  - Using the same decorator instance across different event loops
+  - Avoiding "bound to different event loop" errors
+
+- ❌ **Not suitable for**:
+  - Scenarios requiring cross-thread global mutual exclusion (use `threading.Lock`)
+  - Scenarios requiring shared resource limits across loops
+
+### Complete Examples
+
+See `examples/loop_local_semaphore_example.py` for more usage examples, including:
+- Basic concurrency control
+- Multi-event loop scenarios
+- Integration with `with_async_control`
+- Manual acquire/release control
+- Comparison with standard Semaphore
+
 ## Development Guide
 
 ### Environment Setup

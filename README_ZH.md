@@ -449,6 +449,180 @@ if __name__ == "__main__":
 - with_adaptive_retry 提供动态的负载自适应能力
 - 根据实际需求选择合适的装饰器
 
+## 多线程/多事件循环支持：LoopLocalSemaphore 和 LoopLocalLock
+
+当在多线程环境中使用 asyncio 时，可能会遇到 "RuntimeError: Semaphore/Lock is bound to a different event loop" 错误。Adaptio 提供了 `LoopLocalSemaphore` 和 `LoopLocalLock` 来解决这个问题。
+
+### 核心特性
+
+- 🔄 **Loop 局部存储**：为每个 event loop 自动创建独立的信号量/锁实例
+- 🧵 **多线程友好**：支持在不同线程的不同 event loop 中安全使用
+- 🗑️ **自动清理**：使用弱引用自动清理不再使用的 loop 的资源
+- 🎯 **API 一致**：与标准 `asyncio.Semaphore` 和 `asyncio.Lock` 保持一致的使用方式
+
+### LoopLocalSemaphore
+
+为每个 event loop 提供独立的 `asyncio.Semaphore`，用于并发控制。
+
+```python
+from adaptio import LoopLocalSemaphore
+import asyncio
+import threading
+
+# 创建一个允许最多 3 个并发的信号量
+sem = LoopLocalSemaphore(3)
+
+async def worker(task_id: int):
+    """在当前 loop 中执行的任务"""
+    async with sem:  # 支持 async with 语法
+        print(f"任务 {task_id} 正在执行")
+        await asyncio.sleep(1)
+        print(f"任务 {task_id} 完成")
+
+# 在主线程的 loop 中运行
+async def main():
+    await asyncio.gather(*[worker(i) for i in range(10)])
+
+# 在不同线程的新 loop 中运行 - 完全支持！
+def run_in_thread():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(main())
+    finally:
+        loop.close()
+
+# 启动多个线程，每个线程都有自己的 loop
+threads = [threading.Thread(target=run_in_thread) for _ in range(3)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+```
+
+### LoopLocalLock
+
+为每个 event loop 提供独立的 `asyncio.Lock`，用于互斥控制。
+
+```python
+from adaptio import LoopLocalLock
+import asyncio
+
+lock = LoopLocalLock()
+
+async def critical_section(task_id: int):
+    """需要互斥访问的代码段"""
+    async with lock:
+        print(f"任务 {task_id} 进入临界区")
+        await asyncio.sleep(0.1)
+        print(f"任务 {task_id} 离开临界区")
+
+async def main():
+    await asyncio.gather(*[critical_section(i) for i in range(5)])
+
+asyncio.run(main())
+```
+
+### 与 with_async_control 集成
+
+`with_async_control` 装饰器在 `ignore_loop_bound_exception=True` 时会自动使用 `LoopLocalSemaphore` 和 `LoopLocalLock`：
+
+```python
+from adaptio import with_async_control
+import asyncio
+
+@with_async_control(
+    max_concurrency=5,
+    max_qps=10,
+    ignore_loop_bound_exception=True  # 自动使用 LoopLocal 实现
+)
+async def api_call(task_id: int):
+    await asyncio.sleep(0.5)
+    return f"任务 {task_id} 完成"
+
+# 现在可以在多线程环境中安全使用
+async def main():
+    results = await asyncio.gather(*[api_call(i) for i in range(20)])
+    print(results)
+
+asyncio.run(main())
+```
+
+### API 参考
+
+#### LoopLocalSemaphore
+
+```python
+class LoopLocalSemaphore:
+    def __init__(self, value: int = 1):
+        """
+        初始化信号量
+
+        参数:
+            value: 信号量的初始值（即允许的最大并发数），默认为 1
+        """
+
+    async def acquire(self) -> bool:
+        """获取信号量"""
+
+    def release(self) -> None:
+        """释放信号量"""
+
+    def locked(self) -> bool:
+        """返回当前 loop 的信号量是否已被完全获取"""
+
+    async def __aenter__(self):
+        """支持 async with 语法"""
+
+    async def __aexit__(self, exc_type, exc, tb):
+        """支持 async with 语法"""
+```
+
+#### LoopLocalLock
+
+```python
+class LoopLocalLock:
+    def __init__(self):
+        """初始化锁"""
+
+    async def acquire(self) -> bool:
+        """获取锁"""
+
+    def release(self) -> None:
+        """释放锁"""
+
+    def locked(self) -> bool:
+        """返回当前 loop 的锁是否已被获取"""
+
+    async def __aenter__(self):
+        """支持 async with 语法"""
+
+    async def __aexit__(self, exc_type, exc, tb):
+        """支持 async with 语法"""
+```
+
+### 重要说明
+
+⚠️ **注意**：`LoopLocalSemaphore` 和 `LoopLocalLock` 提供的是"按 loop 局部的并发控制"，而不是跨 loop/跨线程的全局互斥。
+
+- ✅ **适用场景**：
+  - 多线程环境中的异步代码
+  - 需要在不同 event loop 中使用相同的装饰器实例
+  - 避免 "bound to different event loop" 错误
+
+- ❌ **不适用场景**：
+  - 需要跨线程全局互斥的场景（应使用 `threading.Lock`）
+  - 需要跨 loop 共享资源限制的场景
+
+### 完整示例
+
+查看 `examples/loop_local_semaphore_example.py` 获取更多使用示例，包括：
+- 基本并发控制
+- 多 event loop 场景
+- 与 `with_async_control` 集成
+- 手动 acquire/release 控制
+- 与标准 Semaphore 的对比
+
 ## 开发指南
 
 ### 环境设置
