@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 进行版本发布。
 
+## v0.7.0 (2025-12-08)
+
+### Feat
+
+- 实现 LoopLocalSemaphore 支持多线程/多 loop 并发控制
+
 ## v0.6.0 (2025-12-01)
 
 ### Feat
