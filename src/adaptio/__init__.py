@@ -7,6 +7,8 @@ from .adjustable_semaphore import (
     AdjustableSemaphoreType,
     LoopLocalAdjustableSemaphore,
 )
+from .loop_local_lock import LoopLocalLock
+from .loop_local_semaphore import LoopLocalSemaphore
 from .raise_on_aiohttp_overload import raise_on_aiohttp_overload
 from .raise_on_overload_by_guessing import raise_on_overload
 from .with_adaptive_retry import with_adaptive_retry
@@ -17,6 +19,8 @@ __all__ = [
     "AdjustableSemaphore",
     "AdjustableSemaphoreType",
     "LoopLocalAdjustableSemaphore",
+    "LoopLocalLock",
+    "LoopLocalSemaphore",
     "raise_on_aiohttp_overload",
     "raise_on_overload",
     "ServiceOverloadError",
